@@ -1,106 +1,195 @@
-# Event Definition
+# Geomagnetic Storm Event Definition
 
-**Protocol:** `MASTER_PROTOCOL_v1.1`  
-**Primary threshold:** `T = 5`  
-**Event separation parameter:** `Z = 6 hours`
-
-## 1. Purpose
-
-The purpose of this definition is to convert the hourly Kp time series into discrete geomagnetic storm events.
-
-The event definition is independent of any prediction model.
-
-A storm event is not equivalent to an individual positive hourly target.
-
-This distinction is necessary because one physical storm can produce many consecutive hours with elevated Kp.
+**Protocol:** `MASTER_PROTOCOL_v1.1`
+**Status:** Specification complete — implementation pending
 
 ---
 
-## 2. Storm Threshold
+## 1. Purpose
 
-The primary storm threshold is:
+This document defines how the hourly Kp time series is converted into discrete geomagnetic storm events.
+
+The event definition is deterministic and independent of:
+
+* model predictions;
+* probability thresholds;
+* alert episodes;
+* model selection;
+* and model performance.
+
+`MASTER_PROTOCOL_v1.1.md` is the authoritative source for this definition.
+
+---
+
+## 2. Primary Parameters
+
+The primary experiment uses:
 
 ```text
 T = 5
+Z = 6 hours
 ```
 
-An hour satisfies the storm condition when:
+where:
 
-```text
-Kp >= 5
-```
+* `T` is the geomagnetic storm threshold;
+* `Z` is the number of consecutive below-threshold hours required to terminate an event.
+
+These parameters are frozen by the master protocol.
 
 ---
 
 ## 3. Event Start
 
-A storm event begins at the first valid hourly observation satisfying:
+A geomagnetic storm event starts at the first valid hourly observation satisfying:
 
 ```text
 Kp >= T
 ```
 
-provided that this observation represents the beginning of a new event according to the separation rule.
+For the primary experiment:
+
+```text
+Kp >= 5
+```
+
+The timestamp of that observation is the event start time:
+
+```text
+storm_start = first hour where Kp >= T
+```
+
+---
+
+## 4. Event Continuation
+
+Once an event has started, it remains active until the termination condition has been satisfied.
+
+Temporary periods where:
+
+```text
+Kp < T
+```
+
+do not immediately terminate the event.
+
+If Kp returns to or exceeds the threshold before `Z` consecutive valid below-threshold hours have occurred, the same event continues.
+
+Therefore, elevated periods separated by fewer than `Z` consecutive below-threshold hours belong to the same storm event.
+
+---
+
+## 5. Event Termination
+
+An event terminates only after:
+
+```text
+Z = 6
+```
+
+consecutive valid hourly observations satisfying:
+
+```text
+Kp < T
+```
+
+The storm end is defined as the last active storm hour before the terminating sequence of `Z` consecutive below-threshold observations.
 
 Conceptually:
 
 ```text
-first hour with Kp >= T
+Kp >= T
+Kp >= T
+Kp < T   ← first terminating hour
+Kp < T
+Kp < T
+Kp < T
+Kp < T
+Kp < T   ← termination condition confirmed
 ```
 
-marks the event start.
+The six below-threshold hours establish that the previous storm event has ended.
+
+They are not part of the storm event itself.
 
 ---
 
-## 4. Event End
+## 6. Event Separation
 
-An event ends when the storm condition has remained below the threshold for:
+A new threshold crossing belongs to a new independent event only after the previous event has satisfied the complete termination rule.
+
+Therefore:
 
 ```text
-Z = 6 consecutive hours
+fewer than 6 consecutive hours below T
+→ same event
 ```
 
-That is:
+while:
+
+```text
+6 consecutive valid hours below T
+→ previous event terminated
+→ next Kp >= T starts a new event
+```
+
+This rule prevents short fluctuations below the threshold from fragmenting a single storm into multiple events.
+
+---
+
+## 7. Missing Observations
+
+A missing timestamp or missing Kp observation must **not** be interpreted as:
 
 ```text
 Kp < T
 ```
 
-for six consecutive valid hourly observations.
+and therefore must not automatically contribute to the `Z = 6` termination sequence.
 
-The six-hour sequence is treated as the separation period between storm activity and the next independent event.
-
----
-
-## 5. Event Independence
-
-Two periods of elevated Kp are considered separate events only when they are separated according to the full `Z = 6 hour` rule.
-
-A short interruption below the threshold must not automatically create a new event.
-
-This prevents a single physical storm episode from being fragmented into multiple events merely because Kp briefly falls below the threshold.
-
----
-
-## 6. Missing Observations
-
-Missing timestamps must not be treated as equivalent to:
+For example:
 
 ```text
-Kp < T
+12:00   Kp = 4
+13:00   missing
+14:00   Kp = 4
 ```
 
-A missing observation therefore cannot automatically contribute one of the six consecutive below-threshold hours required to terminate an event.
+does not represent three consecutive valid below-threshold observations.
 
-The implementation must explicitly account for continuity of the hourly time grid.
+The event implementation must explicitly verify hourly continuity when evaluating the termination condition.
 
-The precise missing-data behavior must be covered by unit tests before event construction is used for evaluation.
+The final missing-data behavior must remain consistent with the project Data Contract.
 
 ---
 
-## 7. Event Representation
+## 8. Dataset Boundaries
 
-The implementation should represent each event as a structured object or record containing, at minimum:
+### Event active at the beginning of the dataset
+
+If the dataset begins while:
+
+```text
+Kp >= T
+```
+
+the implementation cannot prove that the observed threshold crossing is the true physical beginning of the storm.
+
+This boundary condition must be identified explicitly rather than silently treated as a confirmed event start.
+
+### Event active at the end of the dataset
+
+If an event begins but the dataset ends before the full termination condition can be observed, the event must be treated as right-censored at the dataset boundary.
+
+The implementation must not invent future below-threshold observations to close the event.
+
+Boundary handling must be deterministic and tested.
+
+---
+
+## 9. Canonical Event Representation
+
+Each identified storm event should be represented by a structured record containing at least:
 
 ```text
 event_id
@@ -109,85 +198,94 @@ end_time
 threshold
 ```
 
-Additional derived quantities may be added later without changing the event definition.
+The implementation may include additional metadata when useful, such as:
 
-The event identifier must remain stable across:
+```text
+peak_kp
+duration
+left_censored
+right_censored
+```
 
-- target construction,
-- alert association,
-- evaluation,
-- error analysis,
-- and case-study analysis.
+These additional fields do not change the event definition.
+
+The same event identifiers should be reusable across:
+
+* target construction;
+* alert association;
+* evaluation;
+* error analysis;
+* and case studies.
 
 ---
 
-## 8. Relationship to the Forecast Target
+## 10. Relationship to the Forecast Target
 
-The event definition determines whether a future storm event exists.
+The event definition and target definition are related but conceptually separate.
 
-For a prediction made at time `t`, the primary target asks whether an event begins within:
+The event definition answers:
 
-```text
-t + 1h ... t + H
-```
+> When did geomagnetic storm events occur?
 
-with:
+The target answers:
+
+> Will a geomagnetic storm occur within the next `H` hours?
+
+For the primary experiment:
 
 ```text
 H = 6 hours
+T = 5
 ```
 
-The event definition itself must be constructed independently of model predictions.
+Future Kp information used for target construction must remain separate from feature construction according to the Data Contract.
 
 ---
 
-## 9. Required Unit Tests
+## 11. Required Unit Tests
 
-Before event construction is considered valid, the implementation must test at least:
-
-### Test 1 — Basic event start
-
-A sequence containing a transition from:
+Before event identification is used by the modeling pipeline, the implementation must include tests for at least:
 
 ```text
-Kp < 5
+test_basic_event_start
+test_event_termination_after_z_hours
+test_same_event_when_gap_less_than_z
+test_new_event_after_z_hour_separation
+test_consecutive_storm_hours
+test_missing_timestamp_does_not_count_as_below_threshold
+test_left_dataset_boundary
+test_right_dataset_boundary
 ```
 
-to:
+### Minimum behavioral cases
+
+**Case 1 — Basic event**
 
 ```text
-Kp >= 5
+4 4 5 6 5 4 4 4 4 4 4
+    ↑
+ event start
 ```
 
-must create an event at the first threshold-crossing hour.
+The threshold crossing starts one event.
 
-### Test 2 — Six-hour separation
+**Case 2 — Insufficient separation**
 
-Two periods separated by exactly the protocol-defined termination condition must be handled according to the `Z = 6` rule.
+If elevated activity returns before six consecutive valid below-threshold hours have occurred, both active periods belong to the same event.
 
-### Test 3 — Insufficient separation
+**Case 3 — Complete separation**
 
-A period containing fewer than six consecutive valid below-threshold hours must not incorrectly create a new independent event.
+After six consecutive valid below-threshold hours, a subsequent threshold crossing starts a new event.
 
-### Test 4 — Missing timestamp
+**Case 4 — Missing observation**
 
-A missing hourly observation must not be interpreted as a below-threshold observation.
-
-### Test 5 — Dataset boundary
-
-An event that reaches the end of the available dataset must be handled deterministically and must not require unavailable future observations.
-
-### Test 6 — Consecutive storm hours
-
-Multiple consecutive hours satisfying `Kp >= 5` must belong to the same event unless the separation rule establishes a new event.
+A missing hourly observation cannot be counted as one of the six required below-threshold hours.
 
 ---
 
-## 10. Implementation Requirement
+## 12. Canonical Implementation
 
 The event definition must be implemented once and reused throughout the project.
-
-No individual model, notebook, metric function, or evaluation script should implement its own interpretation of a storm event.
 
 The canonical implementation belongs under:
 
@@ -195,19 +293,19 @@ The canonical implementation belongs under:
 src/definitions/
 ```
 
-and its behavior must be protected by automated tests.
+Evaluation code, notebooks, models, and analysis scripts must not create independent interpretations of the event definition.
 
 ---
 
-## 11. Frozen Methodological Rule
+## 13. Frozen Rule
 
-The following parameters are frozen by the master protocol:
+For the primary system:
 
 ```text
 T = 5
 Z = 6 hours
 ```
 
-They must not be modified based on model performance or test-set results.
+These values must not be modified based on model performance or final-test results.
 
-Alternative threshold or horizon experiments must remain explicitly separated from the primary system.
+Any alternative experiment must be explicitly identified as such and must not silently redefine the primary storm-event definition.

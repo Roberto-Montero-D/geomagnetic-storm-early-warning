@@ -1,73 +1,92 @@
-# Alert Definition
+# Operational Alert Definition
 
-**Protocol:** `MASTER_PROTOCOL_v1.1`  
-**Primary forecast horizon:** `H = 6 hours`  
-**Alert persistence:** `C = 3 hours`  
-**Maximum FAR/day:** `0.2`
+**Protocol:** `MASTER_PROTOCOL_v1.1`
+**Status:** Specification complete — implementation pending
+
+---
 
 ## 1. Purpose
 
-The alert definition converts model probabilities into operational warning episodes.
+This document defines how hourly model probabilities are converted into operational alert episodes and how those episodes are associated with geomagnetic storm events.
 
-The purpose is to evaluate whether the system can issue useful warnings for discrete geomagnetic storm events.
+The alert definition is deterministic and independent of model family.
 
-An individual positive hourly prediction is not automatically considered an independent operational alert.
-
----
-
-## 2. Probability Threshold
-
-At prediction time `t`, the model produces:
-
-```text
-P(event within H hours)
-```
-
-An alert is issued when:
-
-```text
-P(event within H hours) >= tau
-```
-
-where `tau` is the probability threshold selected according to the master protocol.
-
-The primary threshold is selected using out-of-fold predictions and the protocol-defined False Alarm Rate constraint.
-
-The final test set must not be used to select `tau`.
+`MASTER_PROTOCOL_v1.1.md` is the authoritative source for this definition.
 
 ---
 
-## 3. Primary False Alarm Constraint
+## 2. Primary Parameters
 
-The primary operational threshold is the minimum threshold satisfying:
+The primary experiment uses:
 
 ```text
-FAR/day <= 0.2
+H = 6 hours
+C = 3 hours
+maximum FAR/day = 0.2
 ```
 
-The threshold-selection procedure must be applied to the appropriate development / out-of-fold predictions defined by the master protocol.
+where:
 
-The final test period is used only after the threshold has been frozen.
+* `H` is the forecast horizon;
+* `C` is the alert cooldown / episode-grouping interval;
+* `FAR/day` is the operational false-alarm constraint.
+
+The probability threshold `tau` is not fixed in advance.
+
+It is selected using the out-of-fold threshold-selection procedure defined by the master protocol.
 
 ---
 
-## 4. Alert Persistence
+## 3. Hourly Alert
 
-The primary alert persistence parameter is:
+At each prediction time `t`, the model produces:
+
+```text
+P(storm within H hours)
+```
+
+An hourly alert is generated when:
+
+```text
+P(storm within H hours) >= tau
+```
+
+where `tau` is the currently evaluated or frozen operational threshold.
+
+An hourly alert is not itself an independent operational warning episode.
+
+Hourly alerts must first be grouped into alert episodes.
+
+---
+
+## 4. Alert Episode Construction
+
+Alert episodes are constructed using:
 
 ```text
 C = 3 hours
 ```
 
-Consecutive alert-producing predictions are grouped into an alert episode according to this persistence rule.
+Two alert-producing timestamps belong to the same alert episode when the time between them is no greater than `C`.
 
-The purpose is to avoid treating every hourly positive prediction as a separate operational warning.
+Conceptually:
+
+```text
+alert ── alert ───── alert
+  └──── same episode ────┘
+```
+
+provided that consecutive alert occurrences remain within the cooldown rule.
+
+A new alert episode begins when the gap between alert occurrences exceeds `C`.
+
+This grouping prevents repeated hourly predictions from being counted as multiple operational warnings for the same continuous alert period.
 
 ---
 
-## 5. Alert Episode
+## 5. Canonical Alert Episode Representation
 
-The canonical alert object should contain, at minimum:
+Each alert episode should contain at least:
 
 ```text
 alert_episode_id
@@ -78,190 +97,321 @@ associated_event_id
 lead_time
 ```
 
-The exact representation may evolve during implementation, but the underlying definition must remain consistent with the frozen protocol.
+Additional metadata may include:
+
+```text
+number_of_alert_hours
+maximum_probability
+threshold
+duration
+```
+
+These fields do not change the underlying alert definition.
 
 ---
 
-## 6. Alert-to-Event Association
+## 6. Alert-to-Storm Association
 
-An alert episode must be evaluated against the event definition rather than against individual positive Kp hours.
+Alert episodes are evaluated relative to the storm events defined by `docs/event_definition.md`.
 
-Each alert episode should be classified according to its relationship with the storm-event timeline.
+The primary classification is determined from the first alert time of the episode.
 
-The primary categories are:
+For a storm with:
 
 ```text
-Early Detection
-Late Detection
-False Alarm
+storm_start
+storm_end
 ```
 
-The classification must be deterministic and implemented independently from the model itself.
+the relevant forecast window begins at:
+
+```text
+storm_start - H
+```
+
+The alert episode is classified according to its temporal relationship with the storm.
 
 ---
 
 ## 7. Early Detection
 
-An alert is an **Early Detection** when the alert episode provides a warning before the associated storm event begins, according to the protocol-defined temporal relationship.
-
-The lead time is measured from the first qualifying alert to the event start.
-
-Conceptually:
+An alert episode is an **Early Detection** when:
 
 ```text
-first alert
-     ↓
-     lead time
-     ↓
-event start
+storm_start - H <= first_alert_time < storm_start
 ```
+
+For the primary system:
+
+```text
+H = 6 hours
+```
+
+so a qualifying early warning occurs within the six-hour interval preceding storm onset.
+
+The lead time is:
+
+```text
+lead_time = storm_start - first_alert_time
+```
+
+A larger positive lead time represents an earlier warning within the valid forecast horizon.
 
 ---
 
 ## 8. Late Detection
 
-An alert is a **Late Detection** when the system identifies an event only after the event has already begun, while still satisfying the protocol's association rules.
+An alert episode is a **Late Detection** when:
 
-Late detections must be reported separately from genuine early warnings.
+```text
+storm_start <= first_alert_time <= storm_end
+```
 
-They must not be silently counted as equivalent to successful early warnings.
+A late detection indicates that the system identified storm conditions only after the event had already begun.
+
+Late detections must be reported separately from successful early warnings.
+
+They must not be counted as equivalent to an early detection when calculating event-level early-warning performance.
 
 ---
 
 ## 9. False Alarm
 
-An alert episode is a **False Alarm** when it cannot be associated with a valid storm event under the protocol-defined association rules.
+An alert episode is a **False Alarm** when its first alert occurs too early to correspond to a future storm under the configured forecast horizon and it cannot be validly associated with another storm event.
 
-False alarms contribute to operational false-alarm statistics.
+For a candidate storm:
 
-Repeated alert hours within the same alert episode must not be counted as independent false alarms.
+```text
+first_alert_time < storm_start - H
+```
+
+does not constitute a valid early detection of that storm.
+
+Alert association must consider the chronological storm sequence so that an episode is not labeled a false alarm if it validly belongs to another event.
+
+False alarms are counted at the **alert-episode level**, not at the hourly-prediction level.
 
 ---
 
-## 10. Event Recall
+## 10. Multiple Alerts Associated With One Storm
 
-The primary event-level recall is based on the number of storm events that receive a qualifying detection.
+A storm event may have more than one nearby alert episode.
+
+However, event recall is binary at the storm level:
+
+```text
+storm detected
+```
+
+or:
+
+```text
+storm not detected
+```
+
+Multiple alert episodes must not cause the same storm event to be counted multiple times in event recall.
+
+The implementation must deterministically identify the qualifying episode used for event detection and lead-time calculation according to the protocol.
+
+---
+
+## 11. Event Recall
+
+Event Recall measures the fraction of storm events receiving a qualifying early detection.
 
 Conceptually:
 
 ```text
-Event Recall =
-detected storm events
----------------------
-all storm events
+               storms detected early
+Event Recall = ---------------------
+                  total storms
 ```
 
-The implementation must define detection at the event level rather than by counting hourly target labels.
+Hourly target recall must not be substituted for event recall.
+
+A storm with many positive hourly labels remains one physical event for this metric.
 
 ---
 
-## 11. False Alarm Rate per Day
+## 12. False Alarm Rate per Day
 
-The primary operational false-alarm constraint is:
+False Alarm Rate per day is calculated from false **alert episodes**, not individual positive hourly predictions.
+
+Conceptually:
+
+```text
+          number of false alert episodes
+FAR/day = ------------------------------
+             evaluation duration in days
+```
+
+The exact evaluation duration must be calculated consistently across validation folds, OOF threshold selection, and final testing.
+
+The primary operational constraint is:
 
 ```text
 FAR/day <= 0.2
 ```
 
-False alarms must be counted using alert episodes rather than individual hourly predictions.
-
-The denominator and exact calculation must remain consistent across development, validation, OOF, and final-test evaluation.
-
 ---
 
-## 12. Lead Time
+## 13. Lead Time
 
-For an early detection, lead time is measured between:
+Lead time is calculated for a qualifying early detection as:
 
 ```text
-first qualifying alert
+lead_time = storm_start - first_alert_time
 ```
 
-and:
+For the primary system:
 
 ```text
-storm event start
+0 < lead_time <= H
 ```
 
-Positive lead time indicates that the warning preceded the event.
-
-Lead-time distributions should be reported in addition to aggregate detection metrics.
-
----
-
-## 13. Alert Episode Integrity
-
-The implementation must guarantee that:
-
-- consecutive alert hours are not double-counted;
-- one storm event cannot be artificially counted as multiple detections;
-- one alert episode cannot be counted repeatedly;
-- false alarms are counted at the episode level;
-- alert/event associations are deterministic.
-
----
-
-## 14. Required Unit Tests
-
-The implementation must include tests for at least:
-
-### Test 1 — Consecutive alerts
-
-Multiple consecutive alert hours must form one alert episode according to `C = 3`.
-
-### Test 2 — Isolated alert
-
-An isolated alert must remain a valid episode and must not be duplicated.
-
-### Test 3 — Early detection
-
-An alert occurring before an event begins must be classified as an early detection when association criteria are satisfied.
-
-### Test 4 — Late detection
-
-An alert occurring after event onset must be classified separately from an early detection.
-
-### Test 5 — False alarm
-
-An alert with no valid associated event must be classified as a false alarm.
-
-### Test 6 — Multiple alerts near one event
-
-Multiple alert episodes associated with the same storm must be handled according to the protocol without artificially increasing event recall.
-
-### Test 7 — Dataset boundaries
-
-Alerts and events near the beginning or end of the evaluation period must be handled without requiring unavailable information.
-
----
-
-## 15. Threshold Selection and Test Protection
-
-The threshold `tau` must be selected without access to the final test outcomes.
-
-The correct conceptual sequence is:
+with:
 
 ```text
-Development data
-      ↓
-Model training
-      ↓
-Out-of-fold predictions
-      ↓
-Threshold selection
-      ↓
-Frozen threshold
-      ↓
-Final test
+H = 6 hours
 ```
 
-The final test must not be used to choose a more favorable threshold after observing test performance.
+Lead-time statistics should be calculated from storm-level detections rather than treating repeated alerts for the same event as independent observations.
 
 ---
 
-## 16. Frozen Primary Parameters
+## 14. Threshold Selection
 
-The primary alert definition uses:
+The operational probability threshold `tau` is selected using temporally ordered out-of-fold predictions.
+
+Candidate thresholds are evaluated according to the master protocol.
+
+The primary rule is to select the minimum threshold satisfying:
+
+```text
+FAR/day <= 0.2
+```
+
+The threshold is frozen before the protected final test is evaluated.
+
+The final test must not be used to choose or adjust `tau`.
+
+---
+
+## 15. Threshold Stability Analysis
+
+The protocol also evaluates the diagnostic range:
+
+```text
+0.15 <= FAR/day <= 0.20
+```
+
+This analysis is used to assess threshold stability.
+
+It does not replace the primary threshold-selection rule and must not be used retrospectively to choose a more favorable final-test result.
+
+---
+
+## 16. Missing Predictions and Temporal Gaps
+
+Missing prediction timestamps must not silently create or merge alert episodes.
+
+The implementation must verify temporal continuity when applying the cooldown parameter `C`.
+
+A missing timestamp is not equivalent to:
+
+```text
+alert = false
+```
+
+unless that behavior is explicitly defined by the evaluation pipeline.
+
+Alert grouping must remain consistent with the project's missing-data and temporal-integrity rules.
+
+---
+
+## 17. Dataset Boundaries
+
+Alert episodes near the beginning or end of an evaluation period require explicit handling.
+
+The implementation must not:
+
+* associate an alert with an event outside the permitted evaluation logic without documenting the boundary behavior;
+* invent predictions outside the available dataset;
+* or truncate an episode in a way that causes duplicate alert counting.
+
+Boundary behavior must be deterministic and covered by tests.
+
+---
+
+## 18. Required Unit Tests
+
+Before operational evaluation is used for model comparison, the implementation must include tests for at least:
+
+```text
+test_single_alert_episode
+test_consecutive_alerts_same_episode
+test_alert_gap_equal_to_c
+test_alert_gap_greater_than_c
+test_early_detection
+test_late_detection
+test_false_alarm
+test_multiple_alerts_single_storm
+test_multiple_storms
+test_event_recall_not_double_counted
+test_false_alarm_counted_per_episode
+test_lead_time
+test_missing_prediction_timestamp
+test_alert_dataset_boundaries
+```
+
+### Minimum behavioral cases
+
+**Case 1 — Early detection**
+
+```text
+first alert       storm start
+    |-----------------|
+          <= H
+```
+
+The episode is an Early Detection.
+
+**Case 2 — Late detection**
+
+```text
+storm start     first alert     storm end
+     |--------------|--------------|
+```
+
+The episode is a Late Detection.
+
+**Case 3 — False alarm**
+
+An alert episode with no valid associated storm within the forecast horizon is a False Alarm.
+
+**Case 4 — Repeated alerts**
+
+Several alert hours or episodes associated with one storm must not increase event recall above one detection for that storm.
+
+---
+
+## 19. Canonical Implementation
+
+Alert construction and classification must be implemented once and reused throughout the project.
+
+The canonical implementation belongs under:
+
+```text
+src/definitions/
+```
+
+Threshold selection and operational metrics should consume these canonical alert episodes rather than implementing separate alert-grouping logic.
+
+---
+
+## 20. Frozen Primary Rule
+
+For the primary system:
 
 ```text
 H = 6 hours
@@ -269,6 +419,6 @@ C = 3 hours
 maximum FAR/day = 0.2
 ```
 
-These values are defined by `MASTER_PROTOCOL_v1.1`.
+The threshold `tau` is selected exclusively from development / OOF information according to the frozen protocol.
 
-Alternative horizon/threshold experiments must be treated as separate generalization experiments and must not silently redefine the primary system.
+These rules must not be modified after observing final-test performance.
