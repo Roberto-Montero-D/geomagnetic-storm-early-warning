@@ -13,7 +13,7 @@ The objective is **not** to build a generic Kp classifier.
 
 The system is designed to answer the operational question:
 
-> Given only information that would have been available at prediction time `t`, can the system issue a reliable warning that a geomagnetic storm event will begin within the next `H` hours?
+> Given only information that would have been available at prediction time `t`, can the system reliably warn wether geomagnetic storm conditions(`Kp >= T`) will occur within the next `H` hours?
 
 The project therefore treats geomagnetic storm prediction as a **temporal forecasting and operational alert problem**, rather than as ordinary binary classification.
 
@@ -167,7 +167,7 @@ Until this has been verified, no feature transformation should assume a timestam
 
 ## 7. Target Definition
 
-For the primary experiment, the target represents whether a geomagnetic storm event will begin within the forecast horizon.
+For the primary experiment, the target represents whether geomagnetic storm conditions (Kp >= T) will occur within the forecast horizon.
 
 The target is therefore constructed from future Kp information and is kept logically separate from feature construction.
 

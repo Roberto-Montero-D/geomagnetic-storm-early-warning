@@ -165,7 +165,9 @@ The final missing-data behavior must remain consistent with the project Data Con
 
 ## 8. Dataset Boundaries
 
-### Event active at the beginning of the dataset
+Events occurring at dataset boundaries require explicit handling.
+
+### Beginning of the dataset
 
 If the dataset begins while:
 
@@ -173,17 +175,19 @@ If the dataset begins while:
 Kp >= T
 ```
 
-the implementation cannot prove that the observed threshold crossing is the true physical beginning of the storm.
+the available data may be insufficient to determine whether the observed threshold crossing represents the true beginning of the event.
 
-This boundary condition must be identified explicitly rather than silently treated as a confirmed event start.
+### End of the dataset
+If the dataset ends before the full `Z`-hour termination condition can be observed, the available data may be insufficient to determine the true event end.
 
-### Event active at the end of the dataset
+The implementation must:
 
-If an event begins but the dataset ends before the full termination condition can be observed, the event must be treated as right-censored at the dataset boundary.
+* identify these boundary cases explicitly;
+* never invent observations outside the available dataset;
+* handle them deterministically;
+* and document the chosen evaluation behavior before model evaluation begins.
 
-The implementation must not invent future below-threshold observations to close the event.
-
-Boundary handling must be deterministic and tested.
+The exact treatment of boundary events will be finalized and tested during Phase 0 as an implementation/data-integrity decision, before any model results are inspected.
 
 ---
 
@@ -203,8 +207,7 @@ The implementation may include additional metadata when useful, such as:
 ```text
 peak_kp
 duration
-left_censored
-right_censored
+boundary_status
 ```
 
 These additional fields do not change the event definition.

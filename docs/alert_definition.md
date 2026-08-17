@@ -171,7 +171,7 @@ A late detection indicates that the system identified storm conditions only afte
 
 Late detections must be reported separately from successful early warnings.
 
-They must not be counted as equivalent to an early detection when calculating event-level early-warning performance.
+Late Detections count as detected events for Event Recall, but they must remain separate from Early Detections so that Late Detection Rate and Lead Time are reported correctly.
 
 ---
 
@@ -217,19 +217,19 @@ The implementation must deterministically identify the qualifying episode used f
 
 ## 11. Event Recall
 
-Event Recall measures the fraction of storm events receiving a qualifying early detection.
+Event Recall measures the fraction of storm events receiving a qualifying detection.
+
+A storm is considered detected when it receives either:
+
+- an Early Detection; or
+- a Late Detection.
 
 Conceptually:
 
 ```text
-               storms detected early
+               detected storm events
 Event Recall = ---------------------
-                  total storms
-```
-
-Hourly target recall must not be substituted for event recall.
-
-A storm with many positive hourly labels remains one physical event for this metric.
+                  total storm events
 
 ---
 
