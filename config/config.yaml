@@ -1,0 +1,59 @@
+# Project Configuration
+project:
+  name: "Geomagnetic Storm Early Warning System"
+  version: "1.0"
+
+# Target parameters
+target:
+  T: 5          # Kp threshold
+  H: 6          # Prediction horizon (hours)
+
+# Event definition
+event:
+  Z: 6          # Cooldown to separate events (hours)
+
+# Alert definition
+alert:
+  C: 3          # Cooldown between alert episodes (hours)
+
+# Operational constraint
+operational:
+  max_FAR_per_day: 0.2
+
+# Temporal buffer
+temporal:
+  latest_allowed_observation: "t - 1h"
+
+# Temporal splits
+splits:
+  initial_train: [2008, 2016]
+  validation_1: [2017, 2018]
+  train_2: [2008, 2018]
+  validation_2: [2019, 2020]
+  train_3: [2008, 2020]
+  validation_3: [2021]
+  final_test: [2022, 2025]
+
+# Feature layers
+features:
+  layers:
+    - raw
+    - rolling
+    - persistence
+    - dynamics
+    - cme
+    - interactions
+
+# Models
+models:
+  - ExtraTrees
+  - LightGBM
+  - XGBoost
+
+# Imbalance strategies
+imbalance:
+  - class_weighting
+  - random_undersampling
+  - smote
+  - borderline_smote
+  - smote_enn
