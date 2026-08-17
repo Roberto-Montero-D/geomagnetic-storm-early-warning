@@ -1,40 +1,154 @@
-# Project Configuration
+# Geomagnetic Storm Early Warning System
+# Central Project Configuration
+#
+# Protocol: MASTER_PROTOCOL_v1.1
+# Protocol status: Final / Frozen
+#
+# This file mirrors methodological parameters defined by the
+# master protocol. It must not introduce alternative methodological
+# decisions.
+#
+# The master protocol is the source of truth:
+# MASTER_PROTOCOL_v1.1.md
+
+# -------------------------------------------------------------------
+# Project
+# -------------------------------------------------------------------
+
 project:
   name: "Geomagnetic Storm Early Warning System"
-  version: "1.0"
+  protocol_version: "1.1"
+  protocol_status: "frozen"
 
-# Target parameters
+# -------------------------------------------------------------------
+# Primary target
+# -------------------------------------------------------------------
+#
+# Primary experiment:
+#   T = 5
+#   H = 6 hours
+#
+# Target definition:
+#   y_event(t) = max(Kp[t+1 : t+H]) >= T
+#
+# See MASTER_PROTOCOL_v1.1.md, Section 2.4.
+
 target:
-  T: 5          # Kp threshold
-  H: 6          # Prediction horizon (hours)
+  T: 5
+  H: 6
 
-# Event definition
+# -------------------------------------------------------------------
+# Storm event definition
+# -------------------------------------------------------------------
+#
+# An event starts at the first hour where Kp >= T.
+# An event is separated from a subsequent event after Z consecutive
+# hours with Kp < T.
+#
+# See MASTER_PROTOCOL_v1.1.md, Section 2.5.
+
 event:
-  Z: 6          # Cooldown to separate events (hours)
+  Z: 6
 
+# -------------------------------------------------------------------
 # Alert definition
-alert:
-  C: 3          # Cooldown between alert episodes (hours)
+# -------------------------------------------------------------------
+#
+# Hourly alert:
+#   P(storm) >= tau
+#
+# tau is NOT fixed here because it is selected using the OOF
+# threshold-selection procedure defined in Phase 6.
+#
+# C controls alert-episode grouping.
+#
+# See MASTER_PROTOCOL_v1.1.md, Section 2.6.
 
+alert:
+  C: 3
+
+# -------------------------------------------------------------------
 # Operational constraint
+# -------------------------------------------------------------------
+#
+# Primary threshold-selection constraint:
+#
+#   FAR/day <= 0.2
+#
+# See MASTER_PROTOCOL_v1.1.md, Sections 2.7 and 9.2.
+
 operational:
   max_FAR_per_day: 0.2
 
-# Temporal buffer
+# -------------------------------------------------------------------
+# Temporal information cutoff
+# -------------------------------------------------------------------
+#
+# For prediction time t, no OMNI observation corresponding to the
+# interval (t-1h, t] may be used.
+#
+# The latest allowed OMNI observation is the hourly observation whose
+# represented period ends at t-1h.
+#
+# The source timestamp convention must be explicitly verified before
+# feature construction begins.
+#
+# See MASTER_PROTOCOL_v1.1.md, Section 2.1.
+
 temporal:
   latest_allowed_observation: "t - 1h"
+  timestamp_convention_verified: false
 
+# -------------------------------------------------------------------
 # Temporal splits
-splits:
-  initial_train: [2008, 2016]
-  validation_1: [2017, 2018]
-  train_2: [2008, 2018]
-  validation_2: [2019, 2020]
-  train_3: [2008, 2020]
-  validation_3: [2021]
-  final_test: [2022, 2025]
+# -------------------------------------------------------------------
+#
+# These splits are frozen by the master protocol.
+#
+# Year ranges are expressed as inclusive calendar years to mirror the
+# protocol exactly.
+#
+# See MASTER_PROTOCOL_v1.1.md, Section 3.1.
 
+splits:
+
+  initial_train:
+    start_year: 2008
+    end_year: 2016
+
+  validation_1:
+    start_year: 2017
+    end_year: 2018
+
+  train_2:
+    start_year: 2008
+    end_year: 2018
+
+  validation_2:
+    start_year: 2019
+    end_year: 2020
+
+  train_3:
+    start_year: 2008
+    end_year: 2020
+
+  validation_3:
+    start_year: 2021
+    end_year: 2021
+
+  final_test:
+    start_year: 2022
+    end_year: 2025
+
+# -------------------------------------------------------------------
 # Feature layers
+# -------------------------------------------------------------------
+#
+# These layers correspond directly to the feature-engineering
+# specification in MASTER_PROTOCOL_v1.1.md, Section 4.1.
+#
+# Feature implementation is not yet complete.
+
 features:
   layers:
     - raw
@@ -44,16 +158,210 @@ features:
     - cme
     - interactions
 
-# Models
-models:
-  - ExtraTrees
-  - LightGBM
-  - XGBoost
+# -------------------------------------------------------------------
+# Baseline and candidate models
+# -------------------------------------------------------------------
+#
+# Primary model families specified by the protocol.
+#
+# Baselines also include Persistence, Physical, and Logistic
+# Regression as defined in Phase 2.
+#
+# See MASTER_PROTOCOL_v1.1.md, Sections 5 and 8.
 
+models:
+  baselines:
+    - persistence
+    - physical
+    - logistic
+    - ExtraTrees
+
+  candidates:
+    - ExtraTrees
+    - LightGBM
+    - XGBoost
+
+# -------------------------------------------------------------------
 # Imbalance strategies
+# -------------------------------------------------------------------
+#
+# These strategies are evaluated during Phase 4.
+#
+# The parameters below are protocol-defined search values and are
+# not model results.
+#
+# See MASTER_PROTOCOL_v1.1.md, Section 7.1.
+
 imbalance:
-  - class_weighting
-  - random_undersampling
-  - smote
-  - borderline_smote
-  - smote_enn
+
+  strategies:
+
+    - name: none
+
+    - name: class_weighting
+      pos_weight:
+        - 1
+        - 3
+        - 5
+        - 10
+        - 20
+        - 50
+
+    - name: random_undersampling
+      ratio:
+        - "10:1"
+        - "5:1"
+        - "2:1"
+
+    - name: smote
+      k:
+        - 3
+        - 5
+        - 7
+
+    - name: borderline_smote
+      k:
+        - 3
+        - 5
+        - 7
+
+    - name: smote_enn
+
+# -------------------------------------------------------------------
+# Model-selection search space
+# -------------------------------------------------------------------
+#
+# These values are copied from Phase 5 of the frozen protocol.
+#
+# They are not used until the corresponding implementation phase.
+
+model_selection:
+
+  ExtraTrees:
+    n_estimators:
+      - 100
+      - 200
+      - 500
+    max_depth:
+      - 10
+      - 20
+      - null
+
+  LightGBM:
+    learning_rate:
+      - 0.01
+      - 0.05
+      - 0.1
+    num_leaves:
+      - 31
+      - 63
+      - 127
+
+  XGBoost:
+    learning_rate:
+      - 0.01
+      - 0.05
+      - 0.1
+    max_depth:
+      - 3
+      - 6
+      - 9
+
+# -------------------------------------------------------------------
+# OOF threshold selection
+# -------------------------------------------------------------------
+#
+# The final operational threshold is selected globally from
+# temporally ordered OOF predictions.
+#
+# Threshold candidates:
+#   0.01 to 0.99
+#   step = 0.01
+#
+# The selected threshold is the lowest threshold satisfying:
+#   FAR/day <= 0.2
+#
+# See MASTER_PROTOCOL_v1.1.md, Section 9.2.
+
+threshold_selection:
+  method: "global_oof"
+  minimum: 0.01
+  maximum: 0.99
+  step: 0.01
+  selection_constraint: "FAR/day <= 0.2"
+
+# -------------------------------------------------------------------
+# Threshold stability analysis
+# -------------------------------------------------------------------
+#
+# Diagnostic only.
+#
+# The primary operational threshold remains the global OOF-selected
+# threshold and must not be replaced after observing results.
+
+threshold_stability:
+  far_per_day_min: 0.15
+  far_per_day_max: 0.20
+
+# -------------------------------------------------------------------
+# Phase 7 horizon and severity experiments
+# -------------------------------------------------------------------
+#
+# The primary feature set, model, balancing strategy, hyperparameters,
+# and alert rules remain frozen.
+#
+# Only H, T, and the OOF-recalibrated threshold change.
+#
+# See MASTER_PROTOCOL_v1.1.md, Section 10.
+
+phase_7:
+  experiments:
+    - H: 3
+      T: 5
+    - H: 6
+      T: 5
+    - H: 12
+      T: 5
+    - H: 24
+      T: 5
+    - H: 6
+      T: 6
+    - H: 6
+      T: 7
+
+# -------------------------------------------------------------------
+# Final-test protection
+# -------------------------------------------------------------------
+#
+# The final test is used once, after all development decisions have
+# been frozen.
+#
+# Test period:
+#   2022-2025
+#
+# See MASTER_PROTOCOL_v1.1.md, Section 11.
+
+final_test:
+  start_year: 2022
+  end_year: 2025
+  protected: true
+  single_use: true
+
+# -------------------------------------------------------------------
+# Phase 0 verification status
+# -------------------------------------------------------------------
+#
+# These flags document implementation status only. They do not alter
+# the frozen methodological rules.
+#
+# Phase 0 must verify source timestamp semantics and operational
+# information availability before the dataset is constructed.
+
+phase_0:
+  omni_timestamp_verified: false
+  kp_timestamp_verified: false
+  cme_availability_verified: false
+  temporal_cutoff_tested: false
+  event_definition_tested: false
+  alert_definition_tested: false
+  leakage_tests_passing: false

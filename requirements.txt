@@ -1,11 +1,21 @@
+# Core scientific Python stack
 numpy>=1.21.0
 pandas>=1.3.0
-scikit-learn>=1.0.0
-lightgbm>=3.3.0
-xgboost>=1.5.0
-matplotlib>=3.4.0
-seaborn>=0.11.0
-shap>=0.40.0
-pyyaml>=5.4.0
-pytest>=6.0.0
-jupyter>=1.0.0
+scipy
+pyyaml
+
+# Machine learning
+scikit-learn
+lightgbm
+xgboost
+
+# Analysis and visualization
+matplotlib
+seaborn
+shap
+
+# Development and testing
+pytest
+
+# Optional interactive analysis
+jupyter
