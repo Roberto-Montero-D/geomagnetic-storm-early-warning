@@ -13,7 +13,7 @@ The objective is **not** to build a generic Kp classifier.
 
 The system is designed to answer the operational question:
 
-> Given only information that would have been available at prediction time `t`, can the system reliably warn wether geomagnetic storm conditions(`Kp >= T`) will occur within the next `H` hours?
+> Given only information that would have been available at prediction time `t`, can the system reliably warn whether geomagnetic storm conditions (`Kp >= T`) will occur within the next `H` hours?
 
 The project therefore treats geomagnetic storm prediction as a **temporal forecasting and operational alert problem**, rather than as ordinary binary classification.
 

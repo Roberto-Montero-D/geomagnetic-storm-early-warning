@@ -231,7 +231,14 @@ Conceptually:
 Event Recall = ---------------------
                   total storm events
 
----
+```
+
+Early and Late Detections must remain distinguishable so that the Late Detection Rate can be calculated separately.
+
+Hourly target recall must not be substituted for Event Recall.
+
+A storm with many positive hourly labels remains one physical event for this metric.
+
 
 ## 12. False Alarm Rate per Day
 
