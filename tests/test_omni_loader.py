@@ -54,6 +54,7 @@ def write_file(
         content,
         encoding="utf-8",
     )
+
     return path
 
 
@@ -223,3 +224,59 @@ def test_schema_mismatch_raises(tmp_path):
         match="does not match the expected project schema",
     ):
         validate_project_omni_schema(fields)
+
+
+def test_missing_data_column_raises(tmp_path):
+    fmt_path = write_file(
+        tmp_path / "omni.fmt",
+        FMT_TEXT,
+    )
+
+    malformed_rows = []
+
+    for row in LST_TEXT.splitlines():
+        parts = row.split()
+
+        malformed_rows.append(
+            " ".join(parts[:-1])
+        )
+
+    lst_path = write_file(
+        tmp_path / "omni.lst",
+        "\n".join(malformed_rows),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="column count does not match",
+    ):
+        load_omni(
+            fmt_path,
+            lst_path,
+        )
+
+
+def test_extra_data_column_raises(tmp_path):
+    fmt_path = write_file(
+        tmp_path / "omni.fmt",
+        FMT_TEXT,
+    )
+
+    malformed_rows = [
+        row + " 999"
+        for row in LST_TEXT.splitlines()
+    ]
+
+    lst_path = write_file(
+        tmp_path / "omni.lst",
+        "\n".join(malformed_rows),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="column count does not match",
+    ):
+        load_omni(
+            fmt_path,
+            lst_path,
+        )

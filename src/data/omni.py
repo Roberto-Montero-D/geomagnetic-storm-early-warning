@@ -112,29 +112,17 @@ _FMT_LINE_PATTERN = re.compile(
 
 
 def parse_omni_format(path: str | Path) -> list[OmniField]:
-    """Parse an OMNIWeb ``.fmt`` schema file.
-
-    Parameters
-    ----------
-    path
-        Path to the OMNIWeb format file.
-
-    Returns
-    -------
-    list[OmniField]
-        Fields in source-column order.
-
-    Raises
-    ------
-    ValueError
-        If no schema fields are found or positions are not sequential.
-    """
+    """Parse an OMNIWeb ``.fmt`` schema file."""
 
     path = Path(path)
 
     fields: list[OmniField] = []
 
-    with path.open("r", encoding="utf-8", errors="replace") as handle:
+    with path.open(
+        "r",
+        encoding="utf-8",
+        errors="replace",
+    ) as handle:
         for raw_line in handle:
             line = raw_line.rstrip()
 
@@ -160,8 +148,13 @@ def parse_omni_format(path: str | Path) -> list[OmniField]:
             f"No OMNI field definitions were found in {path}."
         )
 
-    expected_positions = list(range(1, len(fields) + 1))
-    actual_positions = [field.position for field in fields]
+    expected_positions = list(
+        range(1, len(fields) + 1)
+    )
+    actual_positions = [
+        field.position
+        for field in fields
+    ]
 
     if actual_positions != expected_positions:
         raise ValueError(
@@ -175,7 +168,7 @@ def parse_omni_format(path: str | Path) -> list[OmniField]:
 def validate_project_omni_schema(
     fields: list[OmniField],
 ) -> None:
-    """Validate that the format file matches the project's OMNI subset."""
+    """Validate that the format file matches the project OMNI subset."""
 
     source_names = tuple(
         field.source_name
@@ -216,7 +209,11 @@ def _construct_timestamp(
 ) -> pd.DatetimeIndex:
     """Construct timestamps from YEAR + DOY + Hour."""
 
-    required = {"year", "doy", "hour"}
+    required = {
+        "year",
+        "doy",
+        "hour",
+    }
 
     missing = required - set(frame.columns)
 
@@ -242,7 +239,10 @@ def _construct_timestamp(
 
     if ((hour < 0) | (hour > 23)).any():
         invalid = sorted(
-            hour[(hour < 0) | (hour > 23)]
+            hour[
+                (hour < 0)
+                | (hour > 23)
+            ]
             .unique()
             .tolist()
         )
@@ -251,7 +251,6 @@ def _construct_timestamp(
             f"Invalid OMNI hour value(s): {invalid}"
         )
 
-    # Parse YEAR + zero-padded day-of-year.
     day = pd.to_datetime(
         year.astype(str)
         + doy.astype(str).str.zfill(3),
@@ -279,7 +278,9 @@ def _validate_timestamp_index(
     """Validate chronological integrity of the OMNI timeline."""
 
     if index.has_duplicates:
-        duplicated = index[index.duplicated()].unique()
+        duplicated = index[
+            index.duplicated()
+        ].unique()
 
         raise ValueError(
             "OMNI data contain duplicate timestamps: "
@@ -373,11 +374,15 @@ def load_omni(
             f"{len(EXPECTED_INTERNAL_NAMES)} are expected."
         )
 
+    # Load raw source columns BEFORE assigning names.
+    #
+    # This is important: assigning ``names=...`` during read_csv can
+    # mask malformed source rows by forcing pandas into the expected
+    # schema shape.
     frame = pd.read_csv(
         lst_path,
         sep=r"\s+",
         header=None,
-        names=EXPECTED_INTERNAL_NAMES,
         engine="python",
     )
 
@@ -387,6 +392,8 @@ def load_omni(
             f"Schema fields: {source_column_count}; "
             f"loaded columns: {frame.shape[1]}."
         )
+
+    frame.columns = EXPECTED_INTERNAL_NAMES
 
     timestamp = _construct_timestamp(frame)
 
