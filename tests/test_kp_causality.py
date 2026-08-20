@@ -410,3 +410,45 @@ def test_incomplete_current_interval_cannot_affect_features():
         original_features,
         mutated_features,
     )
+
+def test_fractional_kp_code_raises():
+    raw = pd.Series([0, 10, 50.5])
+
+    with pytest.raises(
+        ValueError,
+        match=r"integer Kp\*10 codes",
+    ):
+        convert_omni_kp_raw(raw)
+
+
+def test_completely_missing_kp_interval_raises():
+    index = pd.to_datetime(
+        [
+            "2020-01-01 00:00",
+            "2020-01-01 01:00",
+            "2020-01-01 02:00",
+            "2020-01-01 06:00",
+            "2020-01-01 07:00",
+            "2020-01-01 08:00",
+        ]
+    )
+
+    df = pd.DataFrame(
+        {
+            "kp_raw": [
+                20,
+                20,
+                20,
+                50,
+                50,
+                50,
+            ]
+        },
+        index=index,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="continuous hourly time series",
+    ):
+        build_kp_intervals(df)
