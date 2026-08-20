@@ -1,7 +1,7 @@
 # Data Contract
 
-**Protocol:** `MASTER_PROTOCOL_v1.1`
-**Status:** Specification complete — Phase 0 source verification pending
+**Protocol:** `MASTER_PROTOCOL_v1.2.md`  
+**Status:** Phase 0.1 and Phase 0.2 verified — CME and remaining causal infrastructure pending
 
 ---
 
@@ -9,257 +9,182 @@
 
 This document defines the data that may be used by the Geomagnetic Storm Early Warning System and the temporal rules that determine whether each observation is causally available at prediction time.
 
-The Data Contract exists to ensure that:
+It ensures that every feature has a defined source and temporal meaning, future information cannot enter the feature matrix, target construction remains separate from feature construction, retrospective information is not incorrectly treated as real-time information, and temporal assumptions can be tested automatically.
 
-1. every feature has a defined source;
-2. every observation has a defined temporal meaning;
-3. information unavailable at prediction time cannot enter the feature matrix;
-4. feature transformations are deterministic and reproducible;
-5. target construction remains logically separate from feature construction;
-6. retrospective information is not incorrectly treated as real-time information;
-7. temporal assumptions can be verified through automated tests.
-
-`MASTER_PROTOCOL_v1.1.md` is the authoritative source for methodological decisions. This document specifies how those decisions must be interpreted and verified during implementation.
+`MASTER_PROTOCOL_v1.2.md` is the authoritative source for methodological decisions.
 
 ---
 
 ## 2. Fundamental Temporal Rule
 
-For a prediction made at time `t`, the latest permissible OMNI observation is the hourly observation whose represented period ends at:
+For prediction time `t`:
 
 ```text
-t - 1 hour
+information_cutoff = t - 1h
+maximum_feature_information_time <= information_cutoff
 ```
 
-Therefore:
+For raw hourly OMNI measurements, timestamp `s` marks the **start** of the represented interval:
 
 ```text
-latest_allowed_observation = t - 1h
+period_start = s
+period_end   = s + 1h
+period       = [s, s + 1h)
 ```
 
-and:
+The record is eligible only when:
 
 ```text
-maximum_feature_information_time <= t - 1h
+period_end <= t - 1h
 ```
 
-No observation corresponding to the interval:
-
-```text
-(t - 1h, t]
-```
-
-may be used.
-
-### Example
-
-For:
+Example:
 
 ```text
 prediction_time = 14:00
+information_cutoff = 13:00
+12:00 row -> [12:00, 13:00) -> allowed
+13:00 row -> [13:00, 14:00) -> not allowed
 ```
-
-the latest permissible observation period must end at:
-
-```text
-13:00
-```
-
-Therefore:
-
-```text
-Allowed:
-    all valid periods ending <= 13:00
-
-Not allowed:
-    13:00-14:00
-    any future period
-```
-
-The implementation of this rule depends on the verified timestamp semantics of each source.
 
 ---
 
-## 3. Protocol Convention vs. Source Verification
+## 3. Verified Source Convention
 
-The master protocol defines the operational convention required by the project.
+Phase 0.1 verified that the OMNIWeb hourly timestamp is the start of the represented hourly averaging interval. Causal eligibility is determined from `period_end`, not directly from the raw timestamp.
 
-For OMNI variables, the intended representation is:
-
-```text
-Dataset timestamp: end of represented hourly period
-Period represented: [timestamp - 1h, timestamp]
-```
-
-However, this convention must not be treated as empirically verified merely because it appears in the protocol.
-
-Phase 0 must independently verify how the actual OMNI dataset used by the project encodes its timestamps.
-
-Therefore, two concepts must remain separate:
-
-```text
-PROTOCOL REQUIREMENT
-        ↓
-Observation period must end <= t - 1h
-
-SOURCE VERIFICATION
-        ↓
-Determine what the actual OMNI timestamp represents
-```
-
-If the verified source convention differs from the assumed representation, the implementation must be corrected and the discrepancy documented as a Data Contract issue.
-
-This does not constitute a performance-driven methodological change.
+The implementation must normalize source timestamps explicitly rather than relying on implicit dataframe shifts to repair temporal alignment.
 
 ---
 
 ## 4. Data Contract Table
 
-| Variable | Source      | Protocol Timestamp Convention              | Period Represented          | Availability Rule                        | Phase 0 Verification |
-| -------- | ----------- | ------------------------------------------ | --------------------------- | ---------------------------------------- | -------------------- |
-| Bz       | OMNI        | End of period                              | `[timestamp-1h, timestamp]` | `timestamp <= t-1h`                      | Pending              |
-| Bt       | OMNI        | End of period                              | `[timestamp-1h, timestamp]` | `timestamp <= t-1h`                      | Pending              |
-| V        | OMNI        | End of period                              | `[timestamp-1h, timestamp]` | `timestamp <= t-1h`                      | Pending              |
-| Density  | OMNI        | End of period                              | `[timestamp-1h, timestamp]` | `timestamp <= t-1h`                      | Pending              |
-| Pressure | OMNI        | End of period                              | `[timestamp-1h, timestamp]` | `timestamp <= t-1h`                      | Pending              |
-| AE       | OMNI        | End of period                              | `[timestamp-1h, timestamp]` | `timestamp <= t-1h`                      | Pending              |
-| Dst      | OMNI        | End of period                              | `[timestamp-1h, timestamp]` | `timestamp <= t-1h`                      | Pending              |
-| Kp       | Kp index    | Exact hour / protocol-defined hourly value | Hourly value                | `timestamp <= t-1h` when used as feature | Pending              |
-| CME      | CME catalog | Source-dependent                           | Event information           | Only if information was available at `t` | Pending              |
-
-The `Phase 0 Verification` column must be updated only after the corresponding source convention has been documented and tested.
+| Variable | Source | Raw Temporal Meaning | Primary Feature Policy | Phase 0 Status |
+|---|---|---|---|---|
+| Bz | OMNI | `[s, s+1h)` | `period_end <= t-1h` | Verified |
+| Bt | OMNI | `[s, s+1h)` | `period_end <= t-1h` | Verified |
+| V | OMNI | `[s, s+1h)` | `period_end <= t-1h` | Verified |
+| Density | OMNI | `[s, s+1h)` | `period_end <= t-1h` | Verified |
+| Pressure | OMNI | `[s, s+1h)` | `period_end <= t-1h` | Verified |
+| AE | OMNI | Retrospective hourly index | Excluded from primary causal feature set | Verified / excluded |
+| Dst | OMNI | Retrospective hourly index | Excluded from primary causal feature set | Verified / excluded |
+| Kp | OMNI / GFZ | 3-hour interval repeated across hourly OMNI rows | Canonical completed intervals via `kp_asof()` | Verified |
+| CME | SOHO/LASCO catalog | Source-dependent | Pending historical-availability audit | Pending Phase 0.3 |
 
 ---
 
 ## 5. OMNI Timestamp Contract
 
-### 5.1 Current status
-
 ```text
-OMNI timestamp verification: PENDING
+OMNI timestamp verification: VERIFIED
 ```
 
-Before feature construction, Phase 0 must determine whether the timestamp in the exact OMNI dataset used by this project represents:
-
-* the beginning of the averaging interval;
-* the end of the averaging interval;
-* an instantaneous reference time;
-* or another documented convention.
-
-No feature implementation may assume the answer before this verification is complete.
-
-### 5.2 Required verification record
-
-The Phase 0 audit must document:
+Verification record:
 
 ```text
-Dataset:
-Source:
-Source documentation:
-Raw timestamp:
-Physical interval represented:
-Timestamp convention:
-Prediction-time mapping:
-Latest usable record for prediction at t:
-Verification result:
+Dataset: OMNIWeb hourly subset used by this project
+Coverage: 1996-01-01 00:00 through 2025-12-31 23:00
+Rows: 262,992
+Timestamp source: YEAR + DOY + Hour
+Raw timestamp convention: start of represented hourly interval
+Physical interval: [s, s + 1h)
+Normalized information time: period_end = s + 1h
+Prediction-time eligibility: period_end <= t - 1h
+Missing hourly timestamps: 0
+Duplicate timestamps: 0
+Ordering: monotonically increasing
 ```
 
-At least one concrete timestamp example must be included.
+The loader parses the companion `.fmt` schema, validates the expected 17-column subset, checks the actual `.lst` column count before assigning internal names, constructs the timestamp, and validates duplicate timestamps and hourly continuity.
 
-### 5.3 Required causal mapping
-
-After verification, the implementation must establish an unambiguous mapping:
-
-```text
-raw OMNI timestamp
-        ↓
-physical period represented
-        ↓
-period end
-        ↓
-prediction time t
-        ↓
-causal eligibility
-```
-
-An observation is eligible only if its represented information satisfies the protocol cutoff.
+Raw OMNI fill/sentinel values are deliberately preserved by ingestion and must be handled separately from missing timestamps.
 
 ---
 
-## 6. Kp Timestamp Contract
+## 6. Kp Timestamp and Availability Contract
 
-Kp serves two distinct roles in the project:
+### 6.1 Raw representation
 
-1. historical Kp may be used as a feature;
-2. future Kp is used to construct the target.
-
-These roles must remain strictly separated.
-
-### 6.1 Kp used as a feature
-
-Historical Kp values such as:
+OMNI stores Kp in `Kp × 10` integer encoding and repeats each 3-hour value over its three hourly rows.
 
 ```text
-Kp(t-1h)
-Kp(t-3h)
-Kp(t-6h)
-Kp(t-12h)
-Kp(t-24h)
+00:00  50
+01:00  50
+02:00  50
 ```
 
-may only be used if their information satisfies the temporal availability rule.
-
-The exact timestamp semantics of the Kp source must therefore be verified during Phase 0.
-
-### 6.2 Kp used for the target
-
-Future Kp values may be used only inside target construction.
-
-For the primary task:
+represents:
 
 ```text
-y_event(t) = max(Kp[t+1 : t+H]) >= T
+[00:00, 03:00) -> Kp = 5.0
 ```
 
-with:
+### 6.2 Canonical causal representation
+
+Repeated hourly values are collapsed into canonical records:
 
 ```text
-T = 5
-H = 6 hours
+interval_start
+interval_end
+kp
 ```
 
-Future Kp information must never enter `X(t)`.
+`kp_asof(q)` returns the Kp from the most recent interval satisfying:
+
+```text
+interval_end <= q
+```
+
+### 6.3 Predictor lag semantics
+
+```text
+Kp_lag_1h(t)  = kp_asof(t - 1h)
+Kp_lag_3h(t)  = kp_asof(t - 3h)
+Kp_lag_6h(t)  = kp_asof(t - 6h)
+Kp_lag_12h(t) = kp_asof(t - 12h)
+Kp_lag_24h(t) = kp_asof(t - 24h)
+```
+
+The temporal cutoff is applied exactly once. Predictor Kp features must never be constructed directly from the repeated hourly OMNI Kp column.
+
+This policy is a conservative historical availability approximation because the project does not reconstruct the historical GFZ nowcast stream.
+
+### 6.4 Target/event Kp
+
+Target and event truth use retrospective canonical Kp in standard Kp units. Predictor-side `kp_asof()` availability transformation does not apply to ground-truth construction.
 
 ---
 
-## 7. Feature Information Contract
+## 7. AE and Dst Availability Contract
 
-Feature construction and target construction must be implemented as conceptually independent operations.
+AE and Dst are retained during raw ingestion because ingestion must faithfully preserve the source dataset. They are excluded from the primary causal feature set because the retrospective historical products cannot be demonstrated to consistently equal the values available at the historical prediction time.
 
 ```text
-PAST / AVAILABLE INFORMATION
-            ↓
-     build_features(...)
-            ↓
-           X(t)
+raw ingestion:                  allowed
+exploratory analysis:           allowed
+primary causal feature matrix:  excluded
+```
 
+This exclusion was determined during Phase 0 before model training and was not based on predictive performance.
 
-FUTURE INFORMATION
-            ↓
-      build_target(...)
-            ↓
-           y(t)
+---
+
+## 8. Feature Information Contract
+
+Feature and target construction are conceptually independent:
+
+```text
+AVAILABLE INFORMATION -> build_features(...) -> X(t)
+FUTURE INFORMATION    -> build_target(...)   -> y(t)
 ```
 
 The feature builder must not depend on future target information.
 
-The target builder must not modify or influence feature construction.
-
 ---
 
-## 8. Raw Feature Contract
+## 9. Raw Feature Contract
 
-The primary raw feature family defined by the master protocol includes:
+Primary raw causal features:
 
 ```text
 Bz
@@ -267,123 +192,43 @@ Bt
 V
 Density
 Pressure
-AE
-Dst
-Kp(t-1h)
-Kp(t-3h)
-Kp(t-6h)
-Kp(t-12h)
-Kp(t-24h)
+Kp_lag_1h
+Kp_lag_3h
+Kp_lag_6h
+Kp_lag_12h
+Kp_lag_24h
 ```
 
-Every raw feature must satisfy the causal cutoff before being included in the feature matrix.
+AE and Dst remain available in the raw ingested dataset but are not members of the primary operational feature family.
 
 ---
 
-## 9. Rolling Feature Contract
+## 10. Rolling Feature Contract
 
-Rolling features may only use observations that independently satisfy the temporal cutoff.
+Rolling features operate only on observations already normalized to explicit physical periods and filtered by causal eligibility.
 
-The protocol includes rolling statistics over windows such as:
-
-```text
-3h
-6h
-12h
-24h
-```
-
-including quantities such as:
+No unconditional `.shift(1)` rule is defined.
 
 ```text
-rolling mean
-rolling minimum
-rolling standard deviation
+period_end = raw_timestamp + 1h
+period_end <= t - 1h
 ```
 
-Before implementing the exact rolling operation, the OMNI timestamp convention must be verified.
-
-In particular, the project must determine whether an additional shift is required after applying the temporal cutoff.
-
-The implementation must avoid both:
-
-```text
-future leakage
-```
-
-and:
-
-```text
-unnecessary double shifting
-```
-
-The correct behavior must be established through timestamp analysis and unit tests rather than assumption.
+This prevents both future leakage and unnecessary double shifting.
 
 ---
 
-## 10. Persistence Feature Contract
+## 11. Persistence, Dynamic, and Interaction Contracts
 
-Persistence features measure the duration of previously observed physical conditions.
+Persistence calculations must stop at the latest causally available information. Future observations must never extend a persistence interval backward into prediction time.
 
-Examples defined by the protocol include:
-
-```text
-Bz_negative_less_than_-5_duration
-Bz_negative_less_than_-10_duration
-Bz_negative_less_than_-15_duration
-
-V_high_greater_than_500_duration
-V_high_greater_than_600_duration
-```
-
-Persistence calculations must stop at the latest causally available observation.
-
-Future observations must never extend a persistence interval backward into prediction time `t`.
+Every observation used for deltas or slopes must independently satisfy the causal cutoff. Interaction features are valid only when every component variable is causally valid.
 
 ---
 
-## 11. Dynamic Feature Contract
+## 12. CME Availability Contract
 
-Dynamic features include changes and trends such as:
-
-```text
-delta_Bz_1h
-delta_Bz_3h
-delta_V_1h
-delta_V_3h
-slope_Bz_3h
-slope_V_3h
-```
-
-Every observation used to calculate a difference or slope must independently satisfy the causal cutoff.
-
-For example, a slope evaluated for prediction time `t` must not use a point whose represented period extends beyond the latest allowed observation.
-
----
-
-## 12. Interaction Feature Contract
-
-Interaction features may combine causally valid variables.
-
-Examples defined by the protocol include:
-
-```text
-Bz_neg_multiply_V
-Bz_neg_multiply_Density
-Pressure_multiply_V
-```
-
-An interaction feature is causally valid only when **all** of its component variables are causally valid.
-
-A valid historical variable combined with an unavailable variable produces an invalid feature.
-
----
-
-## 13. CME Availability Contract
-
-CME information requires stricter treatment than ordinary retrospective observations.
-
-The following concepts must remain distinct:
+CME information requires a dedicated Phase 0.3 audit. The following concepts must remain distinct:
 
 ```text
 event_time
@@ -392,193 +237,97 @@ publication_time
 availability_time
 ```
 
-The occurrence of a CME before prediction time `t` does **not** prove that all catalog information associated with that CME was available at `t`.
+A CME occurring before `t` does not prove that all retrospective catalog information was available at `t`.
 
-The fundamental CME rule is:
+Fundamental rule:
 
 ```text
 cme_information_available_at_t == True
 ```
 
-Only CME information satisfying this rule may enter the feature matrix.
-
-### 13.1 Potential CME features
-
-The master protocol permits features such as:
-
-```text
-hours_since_cme_observation
-hours_until_cme_eta
-cme_speed_if_available
-cme_energy_if_available
-```
-
-and derived temporal CME features such as:
-
-```text
-hours_since_last_CME
-days_since_last_CME
-
-CME_count_last_24h
-CME_count_last_48h
-CME_count_last_72h
-
-max_CME_speed_last_24h
-max_CME_speed_last_48h
-max_CME_speed_last_72h
-
-hours_until_CME_eta
-```
-
-These features are permitted only when the underlying information was operationally available at prediction time.
-
-### 13.2 CME exclusion rule
-
-If historical real-time availability cannot be reliably reconstructed for a CME variable, that variable must not be treated as operationally available merely because it exists in a retrospective catalog.
-
-The issue must be documented.
-
-Features whose causal availability cannot be demonstrated must be excluded from the operational feature set.
-
-Such exclusion is a Data Contract correction, not a model-performance decision.
+If historical availability cannot be reliably reconstructed for a CME variable, that variable must be excluded from the operational feature set. No final CME availability conclusion is made in this document before Phase 0.3.
 
 ---
 
-## 14. Missing Data Contract
+## 13. Missing Data Contract
 
-Missing observations must not be silently interpreted as physical measurements.
+The implementation distinguishes valid observations, missing values, missing timestamps, unavailable sources, and information not yet available.
 
-The implementation must distinguish between:
+The verified OMNI source timeline from 1996–2025 contains zero missing hourly timestamps, but generic missing-timestamp behavior remains necessary for derived datasets and other sources.
 
-```text
-valid observation
-missing value
-missing timestamp
-source unavailable
-information not yet available
-```
+A missing canonical Kp interval produces missing hourly ground-truth states and must not be treated as below threshold.
 
-These states are not equivalent.
-
-### 14.1 Missing timestamps
-
-Temporal continuity must be explicitly checked.
-
-For example:
-
-```text
-12:00  Kp = 4
-13:00  MISSING
-14:00  Kp = 4
-```
-
-must not automatically be interpreted as three consecutive valid below-threshold hourly observations.
-
-Missing timestamps must therefore not manufacture artificial:
-
-* event termination;
-* persistence duration;
-* rolling continuity;
-* or alert continuity.
-
-### 14.2 Imputation
-
-No imputation policy is defined by this Data Contract at this stage.
-
-Any required imputation strategy must be documented during dataset construction and must respect temporal causality.
-
-Future observations must never be used to impute past feature values.
+No imputation policy is frozen at this stage. Any future imputation must be causal and must never use future observations to impute past feature values.
 
 ---
 
-## 15. Dataset Row Contract
+## 14. Dataset Row Contract
 
-Every model-ready dataset row must correspond to a unique prediction time:
-
-```text
-t
-```
-
-For every row, the implementation must be able to establish:
+Every model-ready row corresponds to one prediction time and must expose or permit auditing of:
 
 ```text
 prediction_time
-latest_allowed_observation
+protocol_information_cutoff
 maximum_feature_information_time
 target_window_start
 target_window_end
 ```
 
-and, where applicable:
+where:
 
 ```text
-storm_id
-CME availability information
+protocol_information_cutoff = prediction_time - 1h
 ```
 
-The core invariant is:
+For raw OMNI:
 
 ```text
-maximum_feature_information_time <= prediction_time - 1h
+period_end <= protocol_information_cutoff
 ```
 
-for feature information governed by the protocol cutoff.
+Where applicable, rows may also carry `storm_id` and CME availability metadata.
 
 ---
 
-## 16. Target Contract
+## 15. Target Contract
 
-For the primary experiment:
+Primary experiment:
 
 ```text
 T = 5
-H = 6 hours
-```
-
-and:
-
-```text
+H = 6h
 y_event(t) = max(Kp[t+1 : t+H]) >= T
 ```
 
-The target uses future information by definition.
-
-This is not leakage because future information is used exclusively to define the outcome being predicted.
-
-Leakage occurs if any of that future information enters the feature matrix or influences feature construction.
+Future information is permitted only inside target construction. Kp used for target/event truth uses the retrospective historical Kp series in standard units.
 
 ---
 
-## 17. Temporal Split Contract
+## 16. Temporal Split Contract
 
-Dataset construction must preserve chronological order.
+| Split | Period |
+|---|---|
+| Initial Train | 1996–2016 |
+| Validation 1 | 2017–2018 |
+| Train 2 | 1996–2018 |
+| Validation 2 | 2019–2020 |
+| Train 3 | 1996–2020 |
+| Validation 3 | 2021 |
+| Final Test | 2022–2025 |
 
-The frozen primary splits are:
-
-| Split         | Period    |
-| ------------- | --------- |
-| Initial Train | 2008–2016 |
-| Validation 1  | 2017–2018 |
-| Train 2       | 2008–2018 |
-| Validation 2  | 2019–2020 |
-| Train 3       | 2008–2020 |
-| Validation 3  | 2021      |
-| Final Test    | 2022–2025 |
-
-No future validation or test information may influence an earlier training period.
-
-The final test period is protected and must not be used during feature selection, model selection, balancing selection, hyperparameter optimization, or threshold selection.
+The historical start was extended from 2008 to 1996 during Phase 0, before model training or performance inspection, after verifying source coverage and data quality. Validation and final-test periods were not changed.
 
 ---
 
-## 18. Required Causality Tests
+## 17. Required Causality Tests
 
-Before model development, the implementation must include automated tests covering at least:
+Already implemented/verified for OMNI/Kp include schema validation, hourly continuity, duplicate timestamp detection, raw Kp encoding conversion, 3-hour bin structure/consistency, protocol-cutoff lag behavior, midnight/year/leap-year boundaries, future-mutation invariance, and protection from incomplete current Kp intervals.
+
+The complete Phase 0 suite must additionally cover:
 
 ```text
 test_timestamp_cutoff
 test_no_future_omni
-test_no_future_kp
 test_rolling_causality
 test_persistence_causality
 test_delta_causality
@@ -591,75 +340,57 @@ test_test_isolation
 test_future_mutation
 ```
 
-These tests are part of Phase 0.
-
 ---
 
-## 19. Future-Mutation Test
+## 18. Future-Mutation Invariant
 
-The project must include a strong causal-invariance test.
-
-Procedure:
-
-1. construct features for prediction time `t`;
-2. store the resulting feature vector;
-3. modify observations occurring strictly after the allowed information cutoff;
-4. reconstruct the features for the same prediction time `t`;
-5. compare both feature vectors.
-
-Expected result:
+For any prediction time `t`, modifying observations strictly after the allowed information cutoff must not change `X(t)`.
 
 ```text
 X_original(t) == X_future_modified(t)
 ```
 
-If changing future observations changes the feature vector at `t`, the feature pipeline contains temporal leakage.
-
-This test should eventually be applied to all major feature families.
+This invariant must eventually be applied to all major feature families.
 
 ---
 
-## 20. Phase 0 Verification Checklist
+## 19. Phase 0 Verification Checklist
 
-Before this Data Contract is considered operationally verified:
-
-* [ ] OMNI timestamp convention verified
-* [ ] OMNI physical interval representation documented
-* [ ] Kp timestamp convention verified
-* [ ] Kp feature availability verified
-* [ ] CME source identified
-* [ ] CME historical availability semantics verified
-* [ ] Temporal cutoff implemented
-* [ ] Missing timestamp behavior defined and tested
-* [ ] Event construction tested
-* [ ] Alert construction tested
-* [ ] Feature/target separation implemented
-* [ ] Rolling causality tested
-* [ ] Persistence causality tested
-* [ ] Dynamic-feature causality tested
-* [ ] CME causality tested
-* [ ] Future-mutation test passing
-* [ ] Temporal split integrity tested
-* [ ] Final-test isolation tested
+- [x] OMNI timestamp convention verified
+- [x] OMNI physical interval representation documented
+- [x] OMNI raw schema validated
+- [x] OMNI hourly continuity verified
+- [x] Kp timestamp convention verified
+- [x] Kp feature availability policy verified
+- [x] Kp causal alignment implemented
+- [x] Kp causality tests passing
+- [x] AE availability semantics audited
+- [x] Dst availability semantics audited
+- [x] AE/Dst primary-feature policy defined
+- [ ] CME historical availability semantics verified
+- [ ] Generic temporal cutoff infrastructure completed
+- [ ] Event construction tested
+- [ ] Alert construction tested
+- [ ] Complete feature/target separation implementation
+- [ ] Rolling causality tested
+- [ ] Persistence causality tested
+- [ ] Dynamic-feature causality tested
+- [ ] CME causality tested
+- [ ] Global future-mutation suite passing
+- [ ] Temporal split integrity tested
+- [ ] Final-test isolation tested
 
 ---
 
-## 21. Completion Rule
-
-The Data Contract becomes operationally verified only when the Phase 0 source audits and causal tests demonstrate that:
+## 20. Completion Rule
 
 ```text
-X(t)
+Data Contract specification:              COMPLETE
+OMNI source verification:                 COMPLETE
+Geomagnetic-index verification:           COMPLETE
+CME source verification:                  PENDING
+Full feature-pipeline verification:       PENDING
+Full implementation/leakage verification: PENDING
 ```
 
-contains only information that could legitimately have been available under the frozen protocol at prediction time `t`.
-
-Until then:
-
-```text
-Data Contract specification: COMPLETE
-Source verification:         PENDING
-Implementation verification: PENDING
-```
-
-No model training should begin before the relevant Phase 0 temporal and causal requirements have been verified.
+No model training should begin before the relevant remaining Phase 0 temporal and causal requirements are verified.

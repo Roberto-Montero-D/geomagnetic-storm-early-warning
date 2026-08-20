@@ -16,7 +16,7 @@ build/
 *.ipynb
 !notebooks/*.ipynb
 
-# Data files (NO subir datos al repositorio)
+# Data files (do not commit raw data)
 data/
 *.csv
 *.h5
@@ -24,7 +24,7 @@ data/
 *.nc
 *.pkl
 
-# Results (solo figuras/tablas finales)
+# Results (keep only final figures/tables)
 results/temp/
 results/*.pkl
 results/*.log

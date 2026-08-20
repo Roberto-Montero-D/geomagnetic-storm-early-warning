@@ -1,287 +1,108 @@
 # Geomagnetic Storm Early Warning System
 # Central Project Configuration
-#
-# Protocol: MASTER_PROTOCOL_v1.1
-# Protocol status: Final / Frozen
-#
-# This file mirrors methodological parameters defined by the
-# master protocol. It must not introduce alternative methodological
-# decisions.
-#
-# The master protocol is the source of truth:
-# MASTER_PROTOCOL_v1.1.md
-
-# -------------------------------------------------------------------
-# Project
-# -------------------------------------------------------------------
+# Protocol: MASTER_PROTOCOL_v1.2
+# Protocol status: Frozen / Phase 0 Amendment
+# The master protocol is the source of truth.
 
 project:
   name: "Geomagnetic Storm Early Warning System"
-  protocol_version: "1.1"
+  protocol_version: "1.2"
   protocol_status: "frozen"
-
-# -------------------------------------------------------------------
-# Primary target
-# -------------------------------------------------------------------
-#
-# Primary experiment:
-#   T = 5
-#   H = 6 hours
-#
-# Target definition:
-#   y_event(t) = max(Kp[t+1 : t+H]) >= T
-#
-# See MASTER_PROTOCOL_v1.1.md, Section 2.4.
 
 target:
   T: 5
   H: 6
 
-# -------------------------------------------------------------------
-# Storm event definition
-# -------------------------------------------------------------------
-#
-# An event starts at the first hour where Kp >= T.
-# An event is separated from a subsequent event after Z consecutive
-# hours with Kp < T.
-#
-# See MASTER_PROTOCOL_v1.1.md, Section 2.5.
-
 event:
   Z: 6
-
-# -------------------------------------------------------------------
-# Alert definition
-# -------------------------------------------------------------------
-#
-# Hourly alert:
-#   P(storm) >= tau
-#
-# tau is NOT fixed here because it is selected using the OOF
-# threshold-selection procedure defined in Phase 6.
-#
-# C controls alert-episode grouping.
-#
-# See MASTER_PROTOCOL_v1.1.md, Section 2.6.
 
 alert:
   C: 3
 
-# -------------------------------------------------------------------
-# Operational constraint
-# -------------------------------------------------------------------
-#
-# Primary threshold-selection constraint:
-#
-#   FAR/day <= 0.2
-#
-# See MASTER_PROTOCOL_v1.1.md, Sections 2.7 and 9.2.
-
 operational:
   max_FAR_per_day: 0.2
 
-# -------------------------------------------------------------------
-# Temporal information cutoff
-# -------------------------------------------------------------------
-#
-# For prediction time t, no OMNI observation corresponding to the
-# interval (t-1h, t] may be used.
-#
-# The latest allowed OMNI observation is the hourly observation whose
-# represented period ends at t-1h.
-#
-# The source timestamp convention must be explicitly verified before
-# feature construction begins.
-#
-# See MASTER_PROTOCOL_v1.1.md, Section 2.1.
-
 temporal:
-  latest_allowed_observation: "t - 1h"
-  timestamp_convention_verified: false
+  information_cutoff: "t - 1h"
 
-# -------------------------------------------------------------------
-# Temporal splits
-# -------------------------------------------------------------------
-#
-# These splits are frozen by the master protocol.
-#
-# Year ranges are expressed as inclusive calendar years to mirror the
-# protocol exactly.
-#
-# See MASTER_PROTOCOL_v1.1.md, Section 3.1.
+  omni:
+    raw_timestamp_represents: "period_start"
+    period_duration_hours: 1
+    period_end_rule: "raw_timestamp + 1h"
+    eligibility_rule: "period_end <= t - 1h"
+    timestamp_convention_verified: true
+
+  kp:
+    source_resolution_hours: 3
+    raw_encoding: "Kp_x10"
+    repeated_hourly_in_omni: true
+    availability_method: "completed_interval_asof"
+    asof_rule: "interval_end <= query_time"
+    lags_hours: [1, 3, 6, 12, 24]
+    historical_nowcast_reconstructed: false
+    availability_policy_verified: true
+
+geomagnetic_indices:
+  ae:
+    ingest_raw: true
+    primary_causal_feature: false
+    exclusion_reason: "retrospective product version not demonstrably available at historical prediction time"
+  dst:
+    ingest_raw: true
+    primary_causal_feature: false
+    exclusion_reason: "retrospective product version not demonstrably available at historical prediction time"
 
 splits:
-
-  initial_train:
-    start_year: 2008
-    end_year: 2016
-
-  validation_1:
-    start_year: 2017
-    end_year: 2018
-
-  train_2:
-    start_year: 2008
-    end_year: 2018
-
-  validation_2:
-    start_year: 2019
-    end_year: 2020
-
-  train_3:
-    start_year: 2008
-    end_year: 2020
-
-  validation_3:
-    start_year: 2021
-    end_year: 2021
-
-  final_test:
-    start_year: 2022
-    end_year: 2025
-
-# -------------------------------------------------------------------
-# Feature layers
-# -------------------------------------------------------------------
-#
-# These layers correspond directly to the feature-engineering
-# specification in MASTER_PROTOCOL_v1.1.md, Section 4.1.
-#
-# Feature implementation is not yet complete.
+  initial_train: {start_year: 1996, end_year: 2016}
+  validation_1: {start_year: 2017, end_year: 2018}
+  train_2: {start_year: 1996, end_year: 2018}
+  validation_2: {start_year: 2019, end_year: 2020}
+  train_3: {start_year: 1996, end_year: 2020}
+  validation_3: {start_year: 2021, end_year: 2021}
+  final_test: {start_year: 2022, end_year: 2025}
 
 features:
-  layers:
-    - raw
-    - rolling
-    - persistence
-    - dynamics
-    - cme
-    - interactions
-
-# -------------------------------------------------------------------
-# Baseline and candidate models
-# -------------------------------------------------------------------
-#
-# Primary model families specified by the protocol.
-#
-# Baselines also include Persistence, Physical, and Logistic
-# Regression as defined in Phase 2.
-#
-# See MASTER_PROTOCOL_v1.1.md, Sections 5 and 8.
+  layers: [raw, rolling, persistence, dynamics, cme, interactions]
+  raw_primary:
+    - bz_gsm
+    - bt
+    - speed
+    - density
+    - flow_pressure
+    - kp_lag_1h
+    - kp_lag_3h
+    - kp_lag_6h
+    - kp_lag_12h
+    - kp_lag_24h
+  raw_ingested_but_excluded_from_primary: [ae, dst]
 
 models:
-  baselines:
-    - persistence
-    - physical
-    - logistic
-    - ExtraTrees
-
-  candidates:
-    - ExtraTrees
-    - LightGBM
-    - XGBoost
-
-# -------------------------------------------------------------------
-# Imbalance strategies
-# -------------------------------------------------------------------
-#
-# These strategies are evaluated during Phase 4.
-#
-# The parameters below are protocol-defined search values and are
-# not model results.
-#
-# See MASTER_PROTOCOL_v1.1.md, Section 7.1.
+  baselines: [persistence, physical, logistic, ExtraTrees]
+  candidates: [ExtraTrees, LightGBM, XGBoost]
 
 imbalance:
-
   strategies:
-
-    - name: none
-
+    - {name: none}
     - name: class_weighting
-      pos_weight:
-        - 1
-        - 3
-        - 5
-        - 10
-        - 20
-        - 50
-
+      pos_weight: [1, 3, 5, 10, 20, 50]
     - name: random_undersampling
-      ratio:
-        - "10:1"
-        - "5:1"
-        - "2:1"
-
+      ratio: ["10:1", "5:1", "2:1"]
     - name: smote
-      k:
-        - 3
-        - 5
-        - 7
-
+      k: [3, 5, 7]
     - name: borderline_smote
-      k:
-        - 3
-        - 5
-        - 7
-
-    - name: smote_enn
-
-# -------------------------------------------------------------------
-# Model-selection search space
-# -------------------------------------------------------------------
-#
-# These values are copied from Phase 5 of the frozen protocol.
-#
-# They are not used until the corresponding implementation phase.
+      k: [3, 5, 7]
+    - {name: smote_enn}
 
 model_selection:
-
   ExtraTrees:
-    n_estimators:
-      - 100
-      - 200
-      - 500
-    max_depth:
-      - 10
-      - 20
-      - null
-
+    n_estimators: [100, 200, 500]
+    max_depth: [10, 20, null]
   LightGBM:
-    learning_rate:
-      - 0.01
-      - 0.05
-      - 0.1
-    num_leaves:
-      - 31
-      - 63
-      - 127
-
+    learning_rate: [0.01, 0.05, 0.1]
+    num_leaves: [31, 63, 127]
   XGBoost:
-    learning_rate:
-      - 0.01
-      - 0.05
-      - 0.1
-    max_depth:
-      - 3
-      - 6
-      - 9
-
-# -------------------------------------------------------------------
-# OOF threshold selection
-# -------------------------------------------------------------------
-#
-# The final operational threshold is selected globally from
-# temporally ordered OOF predictions.
-#
-# Threshold candidates:
-#   0.01 to 0.99
-#   step = 0.01
-#
-# The selected threshold is the lowest threshold satisfying:
-#   FAR/day <= 0.2
-#
-# See MASTER_PROTOCOL_v1.1.md, Section 9.2.
+    learning_rate: [0.01, 0.05, 0.1]
+    max_depth: [3, 6, 9]
 
 threshold_selection:
   method: "global_oof"
@@ -290,56 +111,19 @@ threshold_selection:
   step: 0.01
   selection_constraint: "FAR/day <= 0.2"
 
-# -------------------------------------------------------------------
-# Threshold stability analysis
-# -------------------------------------------------------------------
-#
-# Diagnostic only.
-#
-# The primary operational threshold remains the global OOF-selected
-# threshold and must not be replaced after observing results.
-
 threshold_stability:
   far_per_day_min: 0.15
   far_per_day_max: 0.20
 
-# -------------------------------------------------------------------
-# Phase 7 horizon and severity experiments
-# -------------------------------------------------------------------
-#
-# The primary feature set, model, balancing strategy, hyperparameters,
-# and alert rules remain frozen.
-#
-# Only H, T, and the OOF-recalibrated threshold change.
-#
-# See MASTER_PROTOCOL_v1.1.md, Section 10.
-
 phase_7:
+  # Generalization experiments for the frozen primary system; not independently re-optimized tracks.
   experiments:
-    - H: 3
-      T: 5
-    - H: 6
-      T: 5
-    - H: 12
-      T: 5
-    - H: 24
-      T: 5
-    - H: 6
-      T: 6
-    - H: 6
-      T: 7
-
-# -------------------------------------------------------------------
-# Final-test protection
-# -------------------------------------------------------------------
-#
-# The final test is used once, after all development decisions have
-# been frozen.
-#
-# Test period:
-#   2022-2025
-#
-# See MASTER_PROTOCOL_v1.1.md, Section 11.
+    - {H: 3, T: 5}
+    - {H: 6, T: 5}
+    - {H: 12, T: 5}
+    - {H: 24, T: 5}
+    - {H: 6, T: 6}
+    - {H: 6, T: 7}
 
 final_test:
   start_year: 2022
@@ -347,19 +131,28 @@ final_test:
   protected: true
   single_use: true
 
-# -------------------------------------------------------------------
-# Phase 0 verification status
-# -------------------------------------------------------------------
-#
-# These flags document implementation status only. They do not alter
-# the frozen methodological rules.
-#
-# Phase 0 must verify source timestamp semantics and operational
-# information availability before the dataset is constructed.
+data_coverage:
+  omni:
+    start: "1996-01-01 00:00"
+    end: "2025-12-31 23:00"
+    hourly_rows: 262992
+    missing_timestamps: 0
+    duplicate_timestamps: 0
+  kp:
+    canonical_intervals: 87664
+    missing_intervals: 0
 
 phase_0:
-  omni_timestamp_verified: false
-  kp_timestamp_verified: false
+  omni_timestamp_verified: true
+  omni_loader_verified: true
+  omni_real_data_smoke_test_passed: true
+  kp_timestamp_verified: true
+  kp_availability_policy_verified: true
+  kp_causality_tests_passing: true
+  kp_real_data_smoke_test_passed: true
+  ae_availability_audited: true
+  dst_availability_audited: true
+  ae_dst_primary_exclusion_frozen: true
   cme_availability_verified: false
   temporal_cutoff_tested: false
   event_definition_tested: false

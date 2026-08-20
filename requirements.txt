@@ -6,6 +6,7 @@ pyyaml
 
 # Machine learning
 scikit-learn
+imbalanced-learn
 lightgbm
 xgboost
 
