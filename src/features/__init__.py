@@ -6,6 +6,15 @@ from .dynamics import (
     DYNAMIC_SLOPE_HOURS,
     build_dynamic_features,
 )
+from .integrated import (
+    FEATURE_FAMILY_ORDER,
+    PRIMARY_FEATURE_COLUMNS,
+    build_primary_feature_frame,
+)
+from .interactions import (
+    INTERACTION_FEATURE_COLUMNS,
+    build_interaction_features,
+)
 from .persistence import (
     BZ_PERSISTENCE_THRESHOLDS,
     PERSISTENCE_FEATURE_COLUMNS,
@@ -42,4 +51,9 @@ __all__ = [
     "DYNAMIC_SLOPE_HOURS",
     "DYNAMIC_FEATURE_COLUMNS",
     "build_dynamic_features",
+    "INTERACTION_FEATURE_COLUMNS",
+    "build_interaction_features",
+    "FEATURE_FAMILY_ORDER",
+    "PRIMARY_FEATURE_COLUMNS",
+    "build_primary_feature_frame",
 ]
