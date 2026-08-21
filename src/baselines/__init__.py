@@ -13,6 +13,8 @@ from .persistence import (
     predict_persistence_for_index,
 )
 from .physical import (
+    DEFAULT_BZ_MAGNITUDE_NT,
+    DEFAULT_SPEED_THRESHOLD_KM_S,
     PHYSICAL_FEATURES,
     predict_physical,
     predict_physical_for_index,
@@ -24,6 +26,8 @@ from .logistic import (
     make_logistic_pipeline,
 )
 from .extratrees import (
+    DEFAULT_MAX_DEPTH,
+    DEFAULT_N_ESTIMATORS,
     DEFAULT_RANDOM_STATE,
     EXTRATREES_FEATURES,
     ExtraTreesFoldResult,

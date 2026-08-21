@@ -15,3 +15,11 @@ def test_b3_configuration_is_frozen():
     assert model.n_estimators == 100
     assert model.max_depth == 10
     assert model.class_weight is None
+
+def test_frozen_defaults_are_exported_from_baselines_package():
+    import src.baselines as baselines
+
+    assert baselines.DEFAULT_BZ_MAGNITUDE_NT == 5.0
+    assert baselines.DEFAULT_SPEED_THRESHOLD_KM_S == 500.0
+    assert baselines.DEFAULT_N_ESTIMATORS == 100
+    assert baselines.DEFAULT_MAX_DEPTH == 10
