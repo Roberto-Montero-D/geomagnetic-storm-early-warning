@@ -12,6 +12,11 @@ from .persistence import (
     predict_persistence,
     predict_persistence_for_index,
 )
+from .physical import (
+    PHYSICAL_FEATURES,
+    predict_physical,
+    predict_physical_for_index,
+)
 
 __all__ = [
     "DEVELOPMENT_FOLD_NAMES",
@@ -22,4 +27,7 @@ __all__ = [
     "PERSISTENCE_FEATURE",
     "predict_persistence",
     "predict_persistence_for_index",
+    "PHYSICAL_FEATURES",
+    "predict_physical",
+    "predict_physical_for_index",
 ]
