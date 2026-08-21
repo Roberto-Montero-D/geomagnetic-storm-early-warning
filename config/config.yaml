@@ -55,34 +55,45 @@ splits:
 
 features:
   manifest:
-      total_features: 93
-      family_order:
-        - raw
-        - rolling
-        - persistence
-        - dynamics
-        - interactions
-      rolling:
-        variables: [bz_gsm, bt, speed, density, flow_pressure]
-        windows_hours: [3, 6, 12, 24]
-        statistics: [mean, min, std]
-        std_ddof: 1
-        window_semantics: "physical_time"
-      persistence:
-        bz_lt_nt: [-5, -10, -15]
-        speed_gt_km_s: [500, 600]
-        semantics: "consecutive_exact_hourly_intervals"
-      dynamics:
-        delta_hours: [1, 3]
-        slope_hours: 3
-        slope_method: "OLS over four exact hourly samples spanning 3 elapsed hours"
-      interactions:
-        - bz_neg_x_speed
-        - bz_neg_x_density
-        - flow_pressure_x_speed
-      missing_data:
-        imputation_in_feature_layer: false
-        fallback_to_older_raw_timestamp: false
+    total_features: 93
+    family_order:
+      - raw
+      - rolling
+      - persistence
+      - dynamics
+      - interactions
+
+    rolling:
+      variables:
+        - bz_gsm
+        - bt
+        - speed
+        - density
+        - flow_pressure
+      windows_hours: [3, 6, 12, 24]
+      statistics: [mean, min, std]
+      std_ddof: 1
+      window_semantics: "physical_time"
+
+    persistence:
+      bz_lt_nt: [-5, -10, -15]
+      speed_gt_km_s: [500, 600]
+      semantics: "consecutive_exact_hourly_intervals"
+
+    dynamics:
+      delta_hours: [1, 3]
+      slope_hours: 3
+      slope_method: "OLS over four exact hourly samples spanning 3 elapsed hours"
+
+    interactions:
+      - bz_neg_x_speed
+      - bz_neg_x_density
+      - flow_pressure_x_speed
+
+    missing_data:
+      imputation_in_feature_layer: false
+      fallback_to_older_raw_timestamp: false
+
 kp:
   raw_encoding: "Kp x 10 integer"
   canonical_interval_hours: 3
@@ -119,6 +130,7 @@ cme:
 data_coverage:
   primary_start_year: 1996
   primary_end_year: 2025
+
   cme_cdaw_audit:
     successful_yht_records: 42422
     failed_records: 4
@@ -155,6 +167,7 @@ models:
     - physical
     - logistic
     - ExtraTrees
+
   candidates:
     - ExtraTrees
     - LightGBM
@@ -163,23 +176,30 @@ models:
 imbalance:
   strategies:
     - name: none
+
     - name: class_weighting
       pos_weight: [1, 3, 5, 10, 20, 50]
+
     - name: random_undersampling
       ratio: ["10:1", "5:1", "2:1"]
+
     - name: smote
       k: [3, 5, 7]
+
     - name: borderline_smote
       k: [3, 5, 7]
+
     - name: smote_enn
 
 model_selection:
   ExtraTrees:
     n_estimators: [100, 200, 500]
     max_depth: [10, 20, null]
+
   LightGBM:
     learning_rate: [0.01, 0.05, 0.1]
     num_leaves: [31, 63, 127]
+
   XGBoost:
     learning_rate: [0.01, 0.05, 0.1]
     max_depth: [3, 6, 9]
@@ -225,6 +245,7 @@ phase_0:
   event_definition_tested: true
   alert_definition_tested: true
   leakage_tests_passing: false
+
   causal_features_implemented: true
   causal_feature_manifest_frozen: true
   causal_feature_count: 93
