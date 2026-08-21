@@ -76,9 +76,12 @@ def test_model_is_unbalanced_and_reproducible():
     assert model.max_depth == 10
 
 
-def test_hyperparameters_are_explicitly_required():
-    with pytest.raises(TypeError):
-        make_extratrees_model()
+def test_frozen_hyperparameters_are_used_by_default():
+    model = make_extratrees_model()
+
+    assert model.n_estimators == 100
+    assert model.max_depth == 10
+    assert model.class_weight is None
 
 
 @pytest.mark.parametrize(

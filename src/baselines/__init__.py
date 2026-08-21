@@ -52,4 +52,8 @@ __all__ = [
     "ExtraTreesFoldResult",
     "fit_extratrees_fold",
     "make_extratrees_model",
+    "DEFAULT_BZ_MAGNITUDE_NT",
+    "DEFAULT_SPEED_THRESHOLD_KM_S",
+    "DEFAULT_N_ESTIMATORS",
+    "DEFAULT_MAX_DEPTH"
 ]

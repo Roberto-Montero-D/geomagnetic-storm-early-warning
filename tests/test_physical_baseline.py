@@ -100,13 +100,14 @@ def test_target_and_future_like_columns_cannot_change_prediction():
     pd.testing.assert_series_equal(a, b)
 
 
-def test_thresholds_are_mandatory():
+def test_frozen_thresholds_are_used_by_default():
     frame = pd.DataFrame(
         {"bz_gsm": [-6.0], "speed": [600.0]}
     )
 
-    with pytest.raises(TypeError):
-        predict_physical(frame)
+    prediction = predict_physical(frame)
+
+    assert prediction.tolist() == [1]
 
 
 @pytest.mark.parametrize(
