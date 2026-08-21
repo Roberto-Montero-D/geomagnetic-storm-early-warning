@@ -31,7 +31,10 @@ def _events_for_validation(events: pd.DataFrame, index: pd.DatetimeIndex, horizo
     starts=pd.to_datetime(events["start_time"],errors="raise")
     # Include events whose early-warning window can overlap this validation
     # period, while excluding events that begin after it.
-    mask=(starts >= start) & (starts <= end + pd.Timedelta(hours=horizon_hours))
+    mask = (
+        (starts >= start)
+        & (starts <= end)
+    )
     return events.loc[mask].copy()
 
 def _aggregate_far(rows: list[dict]) -> float:

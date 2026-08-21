@@ -61,3 +61,29 @@ def test_fold_metrics_keep_validation_windows_separate():
     d,folds=_dataset_and_folds()
     r=evaluate_development_folds(d,folds,_events(),thresholds=[0.5])
     assert r.fold_metrics.groupby(["baseline","fold"]).size().eq(1).all()
+
+def test_event_after_validation_end_is_not_evaluable():
+    events = pd.DataFrame(
+        {
+            "event_id": [1],
+            "start_time": [pd.Timestamp("2021-01-02 08:00")],
+            "end_time": [pd.Timestamp("2021-01-02 10:00")],
+            "boundary_status": ["complete"],
+        }
+    )
+
+    index = pd.date_range(
+        "2021-01-01 20:00",
+        periods=10,
+        freq="h",
+    )
+
+    from src.evaluation.cross_fold import _events_for_validation
+
+    scoped = _events_for_validation(
+        events,
+        index,
+        horizon_hours=6,
+    )
+
+    assert scoped.empty
