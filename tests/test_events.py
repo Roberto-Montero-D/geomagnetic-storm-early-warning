@@ -547,6 +547,36 @@ def test_duplicate_interval_start_raises():
     ):
         identify_events(kp)
 
+def test_malformed_kp_value_raises():
+    kp = pd.DataFrame(
+        {
+            "interval_start": pd.DatetimeIndex(
+                [
+                    "2020-01-01 00:00",
+                    "2020-01-01 03:00",
+                    "2020-01-01 06:00",
+                ]
+            ),
+            "interval_end": pd.DatetimeIndex(
+                [
+                    "2020-01-01 03:00",
+                    "2020-01-01 06:00",
+                    "2020-01-01 09:00",
+                ]
+            ),
+            "kp": [
+                1.0,
+                "invalid",
+                2.0,
+            ],
+        }
+    )
+
+    with pytest.raises(
+        (ValueError, TypeError),
+    ):
+        identify_events(kp)
+
 
 def test_nonmonotonic_intervals_raise():
     kp = _intervals(

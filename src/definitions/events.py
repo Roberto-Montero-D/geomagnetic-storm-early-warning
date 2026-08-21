@@ -174,7 +174,7 @@ def _validate_intervals(
 
     frame["kp"] = pd.to_numeric(
         frame["kp"],
-        errors="coerce",
+        errors="raise",
     )
 
     finite_or_missing = (
