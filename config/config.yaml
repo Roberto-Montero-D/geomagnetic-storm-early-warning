@@ -54,32 +54,35 @@ splits:
     end_year: 2025
 
 features:
-  primary_source_universe:
-    - omni_solar_wind
-    - causal_kp_history
-  layers:
-    - raw
-    - rolling
-    - persistence
-    - dynamics
-    - interactions
-  raw_primary:
-    - bz_gsm
-    - bt
-    - speed
-    - density
-    - flow_pressure
-    - kp_lag_1h
-    - kp_lag_3h
-    - kp_lag_6h
-    - kp_lag_12h
-    - kp_lag_24h
-  raw_ingested_but_excluded_from_primary:
-    - ae
-    - dst
-  external_sources_excluded_from_primary:
-    - cdaw_lasco_cme
-
+  manifest:
+      total_features: 93
+      family_order:
+        - raw
+        - rolling
+        - persistence
+        - dynamics
+        - interactions
+      rolling:
+        variables: [bz_gsm, bt, speed, density, flow_pressure]
+        windows_hours: [3, 6, 12, 24]
+        statistics: [mean, min, std]
+        std_ddof: 1
+        window_semantics: "physical_time"
+      persistence:
+        bz_lt_nt: [-5, -10, -15]
+        speed_gt_km_s: [500, 600]
+        semantics: "consecutive_exact_hourly_intervals"
+      dynamics:
+        delta_hours: [1, 3]
+        slope_hours: 3
+        slope_method: "OLS over four exact hourly samples spanning 3 elapsed hours"
+      interactions:
+        - bz_neg_x_speed
+        - bz_neg_x_density
+        - flow_pressure_x_speed
+      missing_data:
+        imputation_in_feature_layer: false
+        fallback_to_older_raw_timestamp: false
 kp:
   raw_encoding: "Kp x 10 integer"
   canonical_interval_hours: 3
@@ -222,3 +225,7 @@ phase_0:
   event_definition_tested: true
   alert_definition_tested: true
   leakage_tests_passing: false
+  causal_features_implemented: true
+  causal_feature_manifest_frozen: true
+  causal_feature_count: 93
+  causal_feature_tests_passing: true
