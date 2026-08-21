@@ -265,7 +265,7 @@ phase_0:
   temporal_integrity_suite_passing: true
   phase_0_complete: true
 
-  phase_1:
+phase_1:
   prediction_grid_implemented: true
   prediction_grid_tested: true
   canonical_dataset_assembly_implemented: true
