@@ -176,7 +176,7 @@ Those remain governed by the frozen master protocol.
 
 ```text
 MASTER_PROTOCOL_v1.3.md
-docs/temporal_contract.md
+docs/temporal_cutoff.md
 docs/event_definition.md
 docs/alert_definition.md
 docs/cme_availability.md
