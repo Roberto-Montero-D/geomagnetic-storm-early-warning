@@ -1,0 +1,1 @@
+"""Temporal causality and information-availability utilities."""
