@@ -23,6 +23,13 @@ from .logistic import (
     fit_logistic_fold,
     make_logistic_pipeline,
 )
+from .extratrees import (
+    DEFAULT_RANDOM_STATE,
+    EXTRATREES_FEATURES,
+    ExtraTreesFoldResult,
+    fit_extratrees_fold,
+    make_extratrees_model,
+)
 
 __all__ = [
     "DEVELOPMENT_FOLD_NAMES",
@@ -40,4 +47,9 @@ __all__ = [
     "LogisticFoldResult",
     "fit_logistic_fold",
     "make_logistic_pipeline",
+    "DEFAULT_RANDOM_STATE",
+    "EXTRATREES_FEATURES",
+    "ExtraTreesFoldResult",
+    "fit_extratrees_fold",
+    "make_extratrees_model",
 ]
