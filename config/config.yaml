@@ -13,6 +13,16 @@ project:
 target:
   T: 5
   H: 6
+  canonical_name: "y_event"
+  semantic_type: "future_storm_condition"
+  window: "(t, t+H]"
+  current_time_included: false
+  horizon_endpoint_included: true
+  retrospective_ground_truth: true
+  positive_rule: "any observed future hourly Kp >= T"
+  negative_rule: "all H future hourly Kp states observed and < T"
+  unknown_rule: "no observed positive and one or more future hourly Kp states missing"
+  missing_target_value: "NaN"
 
 event:
   Z: 6
@@ -245,8 +255,10 @@ phase_0:
   event_definition_tested: true
   alert_definition_tested: true
   leakage_tests_passing: false
-
   causal_features_implemented: true
   causal_feature_manifest_frozen: true
   causal_feature_count: 93
   causal_feature_tests_passing: true
+  target_construction_implemented: true
+  target_definition_frozen: true
+  target_tests_passing: true
