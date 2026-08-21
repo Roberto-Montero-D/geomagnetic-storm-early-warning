@@ -218,7 +218,7 @@ phase_0:
   cme_measurement_causality_feasible: true
   cme_candidate_event_causality_sufficient_for_primary: false
   cme_primary_exclusion_frozen: true
-  temporal_cutoff_tested: false
-  event_definition_tested: false
-  alert_definition_tested: false
+  temporal_cutoff_tested: true
+  event_definition_tested: true
+  alert_definition_tested: true
   leakage_tests_passing: false
