@@ -23,6 +23,13 @@ from .row_status import (
     build_row_status,
 )
 
+from .dataset_audit import (
+    AUDIT_COLUMNS,
+    FINAL_TEST_FORBIDDEN_OUTCOME_COLUMNS,
+    audit_dataset_by_period,
+    audit_feature_missingness_by_period,
+)
+
 __all__ = [
     "DEFAULT_GRID_START",
     "DEFAULT_GRID_END_EXCLUSIVE",
@@ -40,4 +47,8 @@ __all__ = [
     "ROW_STATUS_FEATURE_INCOMPLETE",
     "ROW_STATUS_FEATURE_INCOMPLETE_UNKNOWN_TARGET",
     "build_row_status",
+    "AUDIT_COLUMNS",
+    "FINAL_TEST_FORBIDDEN_OUTCOME_COLUMNS",
+    "audit_dataset_by_period",
+    "audit_feature_missingness_by_period",
 ]
