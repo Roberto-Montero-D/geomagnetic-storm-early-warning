@@ -1,1 +1,1 @@
-# tests package
+"""Data ingestion and causal source-normalization utilities."""

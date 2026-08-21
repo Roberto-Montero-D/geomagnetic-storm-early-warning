@@ -1,21 +1,19 @@
 # Data Contract
 
-**Protocol:** `MASTER_PROTOCOL_v1.2.md`  
-**Status:** Phase 0.1 and Phase 0.2 verified — CME and remaining causal infrastructure pending
+**Protocol:** `MASTER_PROTOCOL_v1.3.md`  
+**Status:** Phase 0.1, Phase 0.2, and Phase 0.3 source-availability audits complete — remaining causal infrastructure pending
 
 ---
 
 ## 1. Purpose
 
-This document defines the data that may be used by the Geomagnetic Storm Early Warning System and the temporal rules that determine whether each observation is causally available at prediction time.
+This document defines the data that may be used by the geomagnetic storm early warning system and the temporal rules required to prevent leakage.
 
-It ensures that every feature has a defined source and temporal meaning, future information cannot enter the feature matrix, target construction remains separate from feature construction, retrospective information is not incorrectly treated as real-time information, and temporal assumptions can be tested automatically.
+`MASTER_PROTOCOL_v1.3.md` is the authoritative source for methodological decisions.
 
-`MASTER_PROTOCOL_v1.2.md` is the authoritative source for methodological decisions.
+The Data Contract ensures that every feature has a defined source and temporal meaning, unavailable information cannot enter the feature matrix, transformations are reproducible, and target construction remains separate from feature construction.
 
----
-
-## 2. Fundamental Temporal Rule
+## 2. Primary Information Cutoff
 
 For prediction time `t`:
 
@@ -24,7 +22,11 @@ information_cutoff = t - 1h
 maximum_feature_information_time <= information_cutoff
 ```
 
-For raw hourly OMNI measurements, timestamp `s` marks the **start** of the represented interval:
+This rule applies independently to every predictor source.
+
+## 3. OMNI Timestamp Semantics
+
+Phase 0.1 verified that an OMNI hourly timestamp `s` marks the **start** of the represented hourly interval:
 
 ```text
 period_start = s
@@ -32,159 +34,37 @@ period_end   = s + 1h
 period       = [s, s + 1h)
 ```
 
-The record is eligible only when:
+An OMNI observation is eligible for prediction at `t` only when:
 
 ```text
 period_end <= t - 1h
 ```
 
-Example:
+No feature builder may replace this rule with an unconditional row shift.
+
+## 4. Primary Data Contract
+
+| Variable / source | Source | Temporal meaning | Primary feature policy |
+|---|---|---|---|
+| Bz | OMNI | `[s, s+1h)` | Eligible if `period_end <= t-1h` |
+| Bt | OMNI | `[s, s+1h)` | Eligible if `period_end <= t-1h` |
+| V | OMNI | `[s, s+1h)` | Eligible if `period_end <= t-1h` |
+| Density | OMNI | `[s, s+1h)` | Eligible if `period_end <= t-1h` |
+| Pressure | OMNI | `[s, s+1h)` | Eligible if `period_end <= t-1h` |
+| Kp | OMNI / GFZ semantics | Canonical 3-hour intervals | Conservative `kp_asof()` mapping |
+| AE | OMNI retrospective series | Retrospective hourly index | Excluded |
+| Dst | OMNI retrospective series | Retrospective hourly index | Excluded |
+| CME | SOHO/LASCO CDAW | Timestamped measurements inside a retrospectively curated candidate universe | Excluded |
+
+The frozen primary predictor universe is:
 
 ```text
-prediction_time = 14:00
-information_cutoff = 13:00
-12:00 row -> [12:00, 13:00) -> allowed
-13:00 row -> [13:00, 14:00) -> not allowed
+causally eligible OMNI solar-wind measurements
++
+conservative causal Kp history
 ```
 
----
-
-## 3. Verified Source Convention
-
-Phase 0.1 verified that the OMNIWeb hourly timestamp is the start of the represented hourly averaging interval. Causal eligibility is determined from `period_end`, not directly from the raw timestamp.
-
-The implementation must normalize source timestamps explicitly rather than relying on implicit dataframe shifts to repair temporal alignment.
-
----
-
-## 4. Data Contract Table
-
-| Variable | Source | Raw Temporal Meaning | Primary Feature Policy | Phase 0 Status |
-|---|---|---|---|---|
-| Bz | OMNI | `[s, s+1h)` | `period_end <= t-1h` | Verified |
-| Bt | OMNI | `[s, s+1h)` | `period_end <= t-1h` | Verified |
-| V | OMNI | `[s, s+1h)` | `period_end <= t-1h` | Verified |
-| Density | OMNI | `[s, s+1h)` | `period_end <= t-1h` | Verified |
-| Pressure | OMNI | `[s, s+1h)` | `period_end <= t-1h` | Verified |
-| AE | OMNI | Retrospective hourly index | Excluded from primary causal feature set | Verified / excluded |
-| Dst | OMNI | Retrospective hourly index | Excluded from primary causal feature set | Verified / excluded |
-| Kp | OMNI / GFZ | 3-hour interval repeated across hourly OMNI rows | Canonical completed intervals via `kp_asof()` | Verified |
-| CME | SOHO/LASCO catalog | Source-dependent | Pending historical-availability audit | Pending Phase 0.3 |
-
----
-
-## 5. OMNI Timestamp Contract
-
-```text
-OMNI timestamp verification: VERIFIED
-```
-
-Verification record:
-
-```text
-Dataset: OMNIWeb hourly subset used by this project
-Coverage: 1996-01-01 00:00 through 2025-12-31 23:00
-Rows: 262,992
-Timestamp source: YEAR + DOY + Hour
-Raw timestamp convention: start of represented hourly interval
-Physical interval: [s, s + 1h)
-Normalized information time: period_end = s + 1h
-Prediction-time eligibility: period_end <= t - 1h
-Missing hourly timestamps: 0
-Duplicate timestamps: 0
-Ordering: monotonically increasing
-```
-
-The loader parses the companion `.fmt` schema, validates the expected 17-column subset, checks the actual `.lst` column count before assigning internal names, constructs the timestamp, and validates duplicate timestamps and hourly continuity.
-
-Raw OMNI fill/sentinel values are deliberately preserved by ingestion and must be handled separately from missing timestamps.
-
----
-
-## 6. Kp Timestamp and Availability Contract
-
-### 6.1 Raw representation
-
-OMNI stores Kp in `Kp × 10` integer encoding and repeats each 3-hour value over its three hourly rows.
-
-```text
-00:00  50
-01:00  50
-02:00  50
-```
-
-represents:
-
-```text
-[00:00, 03:00) -> Kp = 5.0
-```
-
-### 6.2 Canonical causal representation
-
-Repeated hourly values are collapsed into canonical records:
-
-```text
-interval_start
-interval_end
-kp
-```
-
-`kp_asof(q)` returns the Kp from the most recent interval satisfying:
-
-```text
-interval_end <= q
-```
-
-### 6.3 Predictor lag semantics
-
-```text
-Kp_lag_1h(t)  = kp_asof(t - 1h)
-Kp_lag_3h(t)  = kp_asof(t - 3h)
-Kp_lag_6h(t)  = kp_asof(t - 6h)
-Kp_lag_12h(t) = kp_asof(t - 12h)
-Kp_lag_24h(t) = kp_asof(t - 24h)
-```
-
-The temporal cutoff is applied exactly once. Predictor Kp features must never be constructed directly from the repeated hourly OMNI Kp column.
-
-This policy is a conservative historical availability approximation because the project does not reconstruct the historical GFZ nowcast stream.
-
-### 6.4 Target/event Kp
-
-Target and event truth use retrospective canonical Kp in standard Kp units. Predictor-side `kp_asof()` availability transformation does not apply to ground-truth construction.
-
----
-
-## 7. AE and Dst Availability Contract
-
-AE and Dst are retained during raw ingestion because ingestion must faithfully preserve the source dataset. They are excluded from the primary causal feature set because the retrospective historical products cannot be demonstrated to consistently equal the values available at the historical prediction time.
-
-```text
-raw ingestion:                  allowed
-exploratory analysis:           allowed
-primary causal feature matrix:  excluded
-```
-
-This exclusion was determined during Phase 0 before model training and was not based on predictive performance.
-
----
-
-## 8. Feature Information Contract
-
-Feature and target construction are conceptually independent:
-
-```text
-AVAILABLE INFORMATION -> build_features(...) -> X(t)
-FUTURE INFORMATION    -> build_target(...)   -> y(t)
-```
-
-The feature builder must not depend on future target information.
-
----
-
-## 9. Raw Feature Contract
-
-Primary raw causal features:
+## 5. Primary Raw Feature Family
 
 ```text
 Bz
@@ -199,131 +79,198 @@ Kp_lag_12h
 Kp_lag_24h
 ```
 
-AE and Dst remain available in the raw ingested dataset but are not members of the primary operational feature family.
+AE and Dst remain available in raw OMNI ingestion for audit and exploratory analysis but are not members of the primary operational feature family.
 
----
+CDAW/LASCO CME data are retained as a research/audit source but are not members of the primary operational feature family.
 
-## 10. Rolling Feature Contract
+## 6. Kp Causal Availability
 
-Rolling features operate only on observations already normalized to explicit physical periods and filtered by causal eligibility.
+Kp is a canonical 3-hour geomagnetic index. OMNI repeats each 3-hour Kp value across the three hourly rows belonging to that interval. Raw OMNI Kp uses the `Kp × 10` integer encoding and is normalized to standard Kp units.
 
-No unconditional `.shift(1)` rule is defined.
-
-```text
-period_end = raw_timestamp + 1h
-period_end <= t - 1h
-```
-
-This prevents both future leakage and unnecessary double shifting.
-
----
-
-## 11. Persistence, Dynamic, and Interaction Contracts
-
-Persistence calculations must stop at the latest causally available information. Future observations must never extend a persistence interval backward into prediction time.
-
-Every observation used for deltas or slopes must independently satisfy the causal cutoff. Interaction features are valid only when every component variable is causally valid.
-
----
-
-## 12. CME Availability Contract
-
-CME information requires a dedicated Phase 0.3 audit. The following concepts must remain distinct:
+For predictor-side Kp:
 
 ```text
-event_time
-observation_time
-publication_time
-availability_time
+kp_asof(q)
 ```
 
-A CME occurring before `t` does not prove that all retrospective catalog information was available at `t`.
-
-Fundamental rule:
+returns the value from the most recent canonical interval satisfying:
 
 ```text
-cme_information_available_at_t == True
+interval_end <= q
 ```
 
-If historical availability cannot be reliably reconstructed for a CME variable, that variable must be excluded from the operational feature set. No final CME availability conclusion is made in this document before Phase 0.3.
+The primary Kp lag family is:
 
----
+```text
+Kp_lag_1h(t)  = kp_asof(t - 1h)
+Kp_lag_3h(t)  = kp_asof(t - 3h)
+Kp_lag_6h(t)  = kp_asof(t - 6h)
+Kp_lag_12h(t) = kp_asof(t - 12h)
+Kp_lag_24h(t) = kp_asof(t - 24h)
+```
 
-## 13. Missing Data Contract
+Kp used for target/event truth remains retrospective ground truth and is not passed through predictor-side `kp_asof()`.
 
-The implementation distinguishes valid observations, missing values, missing timestamps, unavailable sources, and information not yet available.
+## 7. AE and Dst Availability
 
-The verified OMNI source timeline from 1996–2025 contains zero missing hourly timestamps, but generic missing-timestamp behavior remains necessary for derived datasets and other sources.
+AE and Dst are retained in raw OMNI ingestion but excluded from the primary causal feature set.
 
-A missing canonical Kp interval produces missing hourly ground-truth states and must not be treated as below threshold.
+The historical retrospective series cannot be demonstrated to consistently equal the value available at the historical prediction time.
 
-No imputation policy is frozen at this stage. Any future imputation must be causal and must never use future observations to impute past feature values.
+```text
+raw ingestion:              allowed
+exploratory analysis:       allowed
+primary causal feature set: excluded
+```
 
----
+This decision was made before model training and was not based on predictive performance.
 
-## 14. Dataset Row Contract
+## 8. Feature Information Rules
 
-Every model-ready row corresponds to one prediction time and must expose or permit auditing of:
+Raw observations, rolling statistics, persistence measures, deltas, slopes, and interactions may use only causally eligible input observations.
+
+For every derived feature:
+
+```text
+maximum_input_information_time <= t - 1h
+```
+
+Missing timestamps must not be silently treated as measured values.
+
+## 9. Target Information
+
+The target is separate from the predictor matrix.
+
+```text
+X(t) = information available by t - 1h
+y(t) = storm information occurring in the future target horizon
+```
+
+Future Kp may be used to construct the target and retrospective event truth, but must never enter `X(t)`.
+
+## 10. Dataset Row Contract
+
+Every primary dataset row must be traceable to:
 
 ```text
 prediction_time
-protocol_information_cutoff
 maximum_feature_information_time
-target_window_start
-target_window_end
+target interval
+target value
 ```
 
-where:
+Where applicable, rows may also carry `storm_id` and other non-predictive audit metadata.
+
+## 11. Missing Data Contract
+
+The implementation must distinguish:
+
+- valid measured values;
+- explicit missing values;
+- missing timestamps;
+- unavailable source periods;
+- information not yet available at prediction time.
+
+No missing observation may be interpreted as a valid quiet physical state merely because a value is absent.
+
+Imputation policy, if required, must be frozen before model-performance inspection and fitted only from appropriate training information.
+
+## 12. CME Availability Contract
+
+Phase 0.3 completed the historical-availability audit for SOHO/LASCO CDAW CME information.
+
+The audit distinguishes:
 
 ```text
-protocol_information_cutoff = prediction_time - 1h
+measurement causality
+candidate-event causality
 ```
 
-For raw OMNI:
+### 12.1 Measurement causality
+
+Timestamped CDAW/LASCO height-time (`.yht`) observations provide a technically viable basis for causal kinematic reconstruction after a CME candidate has been defined.
+
+For prediction time `t`:
 
 ```text
-period_end <= protocol_information_cutoff
+information_cutoff = t - 1h
 ```
 
-Where applicable, rows may also carry `storm_id` and CME availability metadata.
-
----
-
-## 15. Target Contract
-
-Primary experiment:
+Only measurements satisfying:
 
 ```text
-T = 5
-H = 6h
-y_event(t) = max(Kp[t+1 : t+H]) >= T
+measurement_time <= information_cutoff
 ```
 
-Future information is permitted only inside target construction. Kp used for target/event truth uses the retrospective historical Kp series in standard units.
+are causally eligible.
 
----
+The full 1996–2025 audit successfully parsed 42,422 height-time trajectories. Of these, 41,705 (98.3098%) contained at least three measurements. Among trajectories with at least three measurements, 99.8945% reached the third measurement within six hours of the first.
 
-## 16. Temporal Split Contract
+Measurement availability itself was therefore not the reason for excluding CME predictors.
 
-| Split | Period |
-|---|---|
-| Initial Train | 1996–2016 |
-| Validation 1 | 2017–2018 |
-| Train 2 | 1996–2018 |
-| Validation 2 | 2019–2020 |
-| Train 3 | 1996–2020 |
-| Validation 3 | 2021 |
-| Final Test | 2022–2025 |
+### 12.2 Candidate-event causality
 
-The historical start was extended from 2008 to 1996 during Phase 0, before model training or performance inspection, after verifying source coverage and data quality. Validation and final-test periods were not changed.
+The unresolved problem is historical candidate identity.
 
----
+The CDAW CME catalog is manually curated and retrospectively revised. Phase 0.3 identified 3,410 explicitly retrospective insertions in the audited event universe.
 
-## 17. Required Causality Tests
+Therefore:
 
-Already implemented/verified for OMNI/Kp include schema validation, hourly continuity, duplicate timestamp detection, raw Kp encoding conversion, 3-hour bin structure/consistency, protocol-cutoff lag behavior, midnight/year/leap-year boundaries, future-mutation invariance, and protection from incomplete current Kp intervals.
+```text
+CME observation occurred before t
+```
 
-The complete Phase 0 suite must additionally cover:
+does not establish:
+
+```text
+CME candidate was historically known at t
+```
+
+and timestamped height-time measurements do not establish that the corresponding candidate grouping was available at `t`.
+
+Neither the investigated CDAW Version 1 nor Version 2 candidate universe provides uniform per-event historical availability semantics sufficient for the primary causal standard across 1996–2025. A Version-1/Version-2 splice is not adopted because it would introduce a catalog-regime change affecting the protected evaluation era.
+
+### 12.3 Primary feature policy
+
+```text
+raw/research CDAW access:             allowed
+CDAW source auditing:                 allowed
+retrospective scientific analysis:    allowed
+future separately specified extension: allowed
+
+primary causal feature matrix:        excluded
+primary feature screening:            excluded
+primary model selection:              excluded
+threshold optimization inputs:        excluded
+```
+
+The exclusion applies to CME counts, time-since-CME variables, final catalog kinematics, geometry, mass/energy products, and reconstructed CME kinematics.
+
+Reconstructed kinematics remain excluded even though measurement-side reconstruction is technically feasible, because the candidate-event universe does not meet the primary historical-availability standard.
+
+### 12.4 Non-performance-driven decision
+
+The CME exclusion was frozen during Phase 0 before CME feature screening, model training with CME predictors, threshold optimization, or final-test inspection.
+
+No CME variable was excluded because of predictive performance.
+
+Detailed evidence is recorded in:
+
+```text
+docs/cme_availability.md
+```
+
+## 13. Source-Unavailability Rule
+
+The LASCO/catalog gaps encountered during Phase 0.3 demonstrate that source unavailability must never be interpreted as zero CME activity.
+
+Because CME is excluded from the primary feature set, no CME missingness or imputation policy is required for the primary experiment.
+
+## 14. Required Causality / Integrity Tests
+
+Phase 0.3 separately implemented CDAW acquisition/parser integrity tests and historical availability audits. These tests support the decision to exclude CME from the primary feature pipeline; CME future-mutation tests are therefore not required for the primary experiment.
+
+The remaining primary pipeline must include tests covering:
 
 ```text
 test_timestamp_cutoff
@@ -332,7 +279,6 @@ test_rolling_causality
 test_persistence_causality
 test_delta_causality
 test_slope_causality
-test_cme_availability
 test_target_future_only
 test_missing_timestamp_handling
 test_train_validation_order
@@ -340,34 +286,22 @@ test_test_isolation
 test_future_mutation
 ```
 
----
+Kp-specific causal tests are already implemented separately.
 
-## 18. Future-Mutation Invariant
+## 15. Phase 0 Verification Checklist
 
-For any prediction time `t`, modifying observations strictly after the allowed information cutoff must not change `X(t)`.
-
-```text
-X_original(t) == X_future_modified(t)
-```
-
-This invariant must eventually be applied to all major feature families.
-
----
-
-## 19. Phase 0 Verification Checklist
-
-- [x] OMNI timestamp convention verified
-- [x] OMNI physical interval representation documented
-- [x] OMNI raw schema validated
-- [x] OMNI hourly continuity verified
-- [x] Kp timestamp convention verified
-- [x] Kp feature availability policy verified
-- [x] Kp causal alignment implemented
-- [x] Kp causality tests passing
-- [x] AE availability semantics audited
-- [x] Dst availability semantics audited
-- [x] AE/Dst primary-feature policy defined
-- [ ] CME historical availability semantics verified
+- [x] OMNI timestamp semantics verified
+- [x] OMNI raw-field mapping verified
+- [x] Kp interval semantics verified
+- [x] Kp predictor-side causal mapping tested
+- [x] AE/Dst historical availability audited
+- [x] AE/Dst primary-feature policy frozen: excluded
+- [x] CME historical availability semantics audited
+- [x] CDAW retrospective catalog behavior documented
+- [x] CDAW height-time measurement availability audited
+- [x] CME measurement causality shown technically feasible
+- [x] CME candidate-event causality limitation identified
+- [x] CME primary-feature policy frozen: excluded
 - [ ] Generic temporal cutoff infrastructure completed
 - [ ] Event construction tested
 - [ ] Alert construction tested
@@ -375,22 +309,18 @@ This invariant must eventually be applied to all major feature families.
 - [ ] Rolling causality tested
 - [ ] Persistence causality tested
 - [ ] Dynamic-feature causality tested
-- [ ] CME causality tested
 - [ ] Global future-mutation suite passing
 - [ ] Temporal split integrity tested
 - [ ] Final-test isolation tested
 
----
-
-## 20. Completion Rule
+## 16. Completion State
 
 ```text
 Data Contract specification:              COMPLETE
 OMNI source verification:                 COMPLETE
 Geomagnetic-index verification:           COMPLETE
-CME source verification:                  PENDING
+CME source verification:                  COMPLETE / EXCLUDED
+Primary source universe:                  FROZEN — OMNI + causal Kp
 Full feature-pipeline verification:       PENDING
 Full implementation/leakage verification: PENDING
 ```
-
-No model training should begin before the relevant remaining Phase 0 temporal and causal requirements are verified.

@@ -1,6 +1,6 @@
 # Operational Alert Definition
 
-**Protocol:** `MASTER_PROTOCOL_v1.2.md`  
+**Protocol:** `MASTER_PROTOCOL_v1.3.md`  
 **Status:** Specification complete — implementation pending
 
 ---
@@ -9,7 +9,7 @@
 
 This document defines how hourly model probabilities are converted into operational alert episodes and how those episodes are associated with geomagnetic storm events. The definition is deterministic and independent of model family.
 
-`MASTER_PROTOCOL_v1.2.md` is the authoritative source.
+`MASTER_PROTOCOL_v1.3.md` is the authoritative source.
 
 ## 2. Primary Parameters
 

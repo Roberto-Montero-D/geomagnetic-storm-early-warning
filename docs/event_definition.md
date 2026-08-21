@@ -1,6 +1,6 @@
 # Geomagnetic Storm Event Definition
 
-**Protocol:** `MASTER_PROTOCOL_v1.2.md`  
+**Protocol:** `MASTER_PROTOCOL_v1.3.md`  
 **Status:** Specification complete — implementation pending
 
 ---
@@ -9,7 +9,7 @@
 
 This document defines how retrospective canonical Kp is converted into discrete geomagnetic storm events. The definition is deterministic and independent of model predictions, probability thresholds, alert episodes, model selection, and model performance.
 
-`MASTER_PROTOCOL_v1.2.md` is the authoritative source.
+`MASTER_PROTOCOL_v1.3.md` is the authoritative source.
 
 ## 2. Primary Parameters
 

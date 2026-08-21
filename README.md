@@ -1,133 +1,179 @@
 # Geomagnetic Storm Early Warning System
 
 **Status:** Protocol Frozen — Phase 0 Implementation in Progress  
-**Protocol:** `MASTER_PROTOCOL_v1.2.md`  
+**Protocol:** `MASTER_PROTOCOL_v1.3.md`  
 **Primary Horizon:** 6 hours  
 **Primary Storm Threshold:** Kp ≥ 5
 
 ## 1. Project Overview
 
-This repository contains the implementation of a scientifically controlled early warning system for geomagnetic storms. The objective is **not** to build a generic Kp classifier.
+This repository implements a scientifically controlled early-warning system for geomagnetic storms.
 
-> Given only information that would have been available at prediction time `t`, can the system reliably warn whether geomagnetic storm conditions (`Kp >= T`) will occur within the next `H` hours?
+The objective is **not** to build a generic Kp classifier. The operational question is:
 
-Version 1.2 incorporates source-verification amendments established during Phase 0 before model training: the 1996 historical extension, verified OMNI timestamp semantics, conservative Kp availability, and exclusion of retrospective AE/Dst from the primary causal feature set.
+> Given only information that would have been available at prediction time `t`, can the system issue a reliable warning that geomagnetic storm conditions will occur within the next `H` hours?
+
+Version 1.3 incorporates the completed Phase 0 source-availability audits performed before model training. These amendments establish the 1996 historical coverage, verified OMNI timestamp semantics, conservative Kp availability, exclusion of retrospective AE/Dst from the primary causal feature set, and exclusion of CDAW/LASCO CME-derived predictors because uniform historical candidate-event availability could not be demonstrated.
+
+The primary predictor universe is therefore frozen to **causally eligible OMNI solar-wind measurements plus conservative causal Kp history**.
 
 ## 2. Scientific Principles
 
-1. Causal temporal information.
-2. Explicit event definition.
-3. Operational alert episodes.
-4. Chronological validation.
-5. Protected final test.
+1. **Causal temporal information** — features may only use information available by the prediction cutoff.
+2. **Explicit event definition** — storm events are defined independently of the model.
+3. **Operational alert definition** — hourly alerts are grouped into alert episodes and evaluated at event level.
+4. **Temporal validation** — training, validation, OOF threshold selection, and testing are chronological.
+5. **Final-test protection** — 2022–2025 remains untouched during development.
 
 ## 3. Current Implementation Status
 
 ### Completed
 
-- [x] Master protocol and central configuration
-- [x] Repository scaffold and Data Contract specification
-- [x] Event and alert specifications
+- [x] Master protocol and Phase 0 amendment history
+- [x] Central configuration
+- [x] Data Contract specification
+- [x] Event definition specification
+- [x] Alert definition specification
 - [x] OMNI timestamp/source audit
-- [x] OMNI `.fmt` + `.lst` loader
-- [x] OMNI schema and timeline validation
-- [x] Real 1996–2025 OMNI smoke test
-- [x] Kp timestamp and 3-hour interval semantics
-- [x] Causal Kp normalization and causality tests
-- [x] Real 1996–2025 Kp integration test
-- [x] AE/Dst availability audit and primary-feature exclusion policy
+- [x] OMNI loader
+- [x] Kp canonical interval and causal mapping implementation
+- [x] Kp causality tests
+- [x] AE/Dst historical-availability audit
+- [x] CDAW/LASCO CME historical-availability audit
+- [x] Full 1996–2025 CDAW height-time audit
+- [x] CME measurement-vs-candidate causality assessment
+- [x] CME primary-feature exclusion policy
+- [x] Primary source universe frozen to OMNI + causal Kp
 
 ### Pending
 
-- [ ] CME information-availability audit
 - [ ] Generic temporal cutoff infrastructure
+- [ ] Event detection implementation and tests
+- [ ] Alert episode implementation and tests
+- [ ] Causal rolling/persistence/dynamic/interaction feature pipeline
+- [ ] Target construction
+- [ ] Global temporal leakage/future-mutation tests
 - [ ] Dataset construction
-- [ ] Event and alert implementation
-- [ ] Causal feature pipeline and target builder
-- [ ] Full temporal leakage suite
-- [ ] Baselines, feature screening, imbalance screening, model selection
-- [ ] Walk-forward validation and OOF threshold selection
-- [ ] Alternative H/T experiments
+- [ ] Baseline models
+- [ ] Feature screening
+- [ ] Imbalance experiments
+- [ ] Model selection
+- [ ] Walk-forward validation
+- [ ] OOF threshold selection
+- [ ] Alternative horizon/severity experiments
 - [ ] Protected final test
 - [ ] Error analysis and scientific audit
 
-## 4. Repository Structure
+No model result is final while the required implementation and protected evaluation stages remain incomplete.
 
-```text
-geomagnetic-storm-early-warning/
-├── MASTER_PROTOCOL_v1.2.md
-├── README.md
-├── requirements.txt
-├── config/
-│   └── config.yaml
-├── docs/
-│   ├── data_contract.md
-│   ├── event_definition.md
-│   └── alert_definition.md
-├── scripts/
-│   └── smoke_test_omni_kp.py
-├── src/
-│   ├── analysis/
-│   ├── data/
-│   │   ├── omni.py
-│   │   └── kp.py
-│   ├── definitions/
-│   ├── evaluation/
-│   └── models/
-└── tests/
-    ├── test_omni_loader.py
-    └── test_kp_causality.py
-```
-
-Raw `data/` is local and intentionally excluded from version control by `.gitignore`.
-
-## 5. Primary Experimental Configuration
+## 4. Primary Experimental Configuration
 
 | Parameter | Primary value |
 |---|---:|
-| Storm threshold T | 5 |
-| Forecast horizon H | 6 h |
-| Event separation Z | 6 h |
-| Alert cooldown C | 3 h |
+| Storm threshold `T` | 5 |
+| Forecast horizon `H` | 6 h |
+| Event separation / termination `Z` | 6 h |
+| Alert episode gap `C` | 3 h |
 | Maximum FAR/day | 0.2 |
-| Protocol information cutoff | `t - 1h` |
+| Information cutoff | `t - 1h` |
+| Historical development start | 1996 |
+| Protected Final Test | 2022–2025 |
 
-For OMNI:
+## 5. Primary Predictor Sources
+
+The primary operational model is restricted to:
 
 ```text
-period_end = raw_timestamp + 1h
-period_end <= t - 1h
+causally eligible OMNI solar-wind measurements
++
+conservative causal Kp history
 ```
+
+Excluded from the primary causal feature matrix:
+
+- **AE and Dst:** retrospective historical values cannot be demonstrated to consistently equal values available at historical prediction time.
+- **CDAW/LASCO CME:** timestamped height-time measurements are technically suitable for causal reconstruction, but the retrospectively curated candidate-event universe does not provide uniform historical availability semantics across 1996–2025.
+
+CME acquisition, parsing, tests, and audit results are retained for reproducibility and possible future research extensions.
+
+See `docs/cme_availability.md`.
 
 ## 6. Temporal Information Rule
 
-Phase 0.1 verified that raw OMNIWeb timestamps mark the start of represented hourly intervals `[s, s+1h)`. For prediction at 14:00, the 12:00 row ending at 13:00 is allowed; the 13:00 row ending at 14:00 is not.
-
-## 7. Kp Causal Availability
-
-Kp is a 3-hour index repeated across three hourly OMNI rows. The implementation collapses this representation into canonical intervals. `kp_asof(q)` returns the most recent interval satisfying `interval_end <= q`.
-
-Primary lags are `kp_asof(t-1h)`, `kp_asof(t-3h)`, `kp_asof(t-6h)`, `kp_asof(t-12h)`, and `kp_asof(t-24h)`.
-
-This is a conservative historical availability approximation; the historical GFZ nowcast stream is not reconstructed.
-
-## 8. Target and Event Ground Truth
-
-Future retrospective Kp is used only to construct the target. Predictor-side `kp_asof()` does not apply to target/event truth.
-
-The primary target is:
+For prediction time `t`:
 
 ```text
-y_event(t) = max(Kp[t+1:t+H]) >= T
+information_cutoff = t - 1h
 ```
 
-Storm onset is the start of the first canonical 3-hour Kp interval satisfying `Kp >= T`. Event segmentation uses an hourly-expanded ground-truth state so `Z=6h` remains the frozen separation rule.
+For raw OMNI timestamp `s`:
 
-## 9. Alert Definition
+```text
+period_start = s
+period_end   = s + 1h
+eligible     = period_end <= information_cutoff
+```
 
-An alert occurs when `P(event within H hours) >= tau`. Alert-producing timestamps are grouped with `C=3h`. Operational evaluation is performed at alert-episode and storm-event level.
+This verified interval rule must be used by all primary OMNI-derived features.
 
-## 10. Validation Strategy
+## 7. Kp Causality
+
+Kp is treated as a canonical 3-hour index.
+
+Predictor-side Kp uses:
+
+```text
+kp_asof(q) = most recent canonical Kp interval with interval_end <= q
+```
+
+Primary lag family:
+
+```text
+1h, 3h, 6h, 12h, 24h
+```
+
+Retrospective Kp remains valid for event and target ground truth.
+
+## 8. CME Phase 0.3 Result
+
+The full CDAW height-time audit produced:
+
+```text
+successful .yht records:                 42,422
+>=3 measurement trajectories:            41,705
+fraction >=3:                            98.3098%
+third point within 6h:                   99.8945%
+explicit retrospective insertions:        3,410
+duplicate-timestamp trajectories:             21
+non-monotonic trajectories:                  17
+invalid heights:                              0
+```
+
+These results demonstrate that measurement-level causal reconstruction is technically feasible.
+
+CME was nevertheless excluded because **candidate-event historical availability** could not be established uniformly enough for the primary causal standard. The decision was made before model training and was not based on predictive performance.
+
+## 9. Event and Alert Definitions
+
+Storm events are defined from retrospective canonical Kp according to `docs/event_definition.md`.
+
+Operational alert episodes and their association with events are defined in `docs/alert_definition.md`.
+
+Primary operational evaluation uses:
+
+```text
+Event Recall
+FAR/day
+Lead Time
+```
+
+with:
+
+```text
+FAR/day <= 0.2
+```
+
+## 10. Temporal Validation
 
 | Split | Period |
 |---|---|
@@ -139,31 +185,41 @@ An alert occurs when `P(event within H hours) >= tau`. Alert-producing timestamp
 | Validation 3 | 2021 |
 | Final Test | 2022–2025 |
 
-The historical training start was extended from 2008 to 1996 during Phase 0 after source coverage and data quality were verified. Validation periods and the protected final-test period were not changed.
+The Final Test is single-use and must not influence source selection, feature selection, model selection, hyperparameters, balancing, or threshold selection.
 
-## 11. Metrics
+## 11. Repository Structure
 
-Primary operational metrics are Event Recall, FAR/day, and Lead Time. Late Detection Rate, Precision, PR-AUC, and reliability/calibration are secondary or diagnostic as specified by the protocol.
+The Phase 0.3 target repository structure includes:
 
-## 12. Data Sources
+```text
+geomagnetic-storm-early-warning/
+├── MASTER_PROTOCOL_v1.3.md
+├── README.md
+├── config/
+│   └── config.yaml
+├── docs/
+│   ├── data_contract.md
+│   ├── event_definition.md
+│   ├── alert_definition.md
+│   └── cme_availability.md
+├── scripts/
+│   ├── smoke_test_omni_kp.py
+│   ├── audit_cdaw_yht.py
+│   └── retry_cdaw_failures.py
+├── src/
+│   └── data/
+│       ├── omni.py
+│       ├── kp.py
+│       └── cme_cdaw.py
+└── tests/
+    ├── test_omni_loader.py
+    ├── test_kp_causality.py
+    └── test_cme_cdaw.py
+```
 
-The current OMNI subset contains magnetic-field quantities, solar-wind temperature, density, speed, flow pressure, electric field, plasma beta, Alfvén Mach number, Kp, Dst, and AE.
+The CDAW implementation/audit files are **audit/research infrastructure** and must not be imported by the primary feature pipeline.
 
-AE and Dst are preserved during raw ingestion but excluded from the primary causal feature set. CME information is admitted only when historical real-time availability can be demonstrated; that audit remains Phase 0.3.
-
-## 13. Reproducibility
-
-Phase 0 validation currently includes:
-
-- 262,992 continuous hourly OMNI rows from 1996–2025;
-- zero missing or duplicate OMNI timestamps;
-- 87,664 canonical Kp intervals;
-- zero missing canonical Kp intervals;
-- automated OMNI loader tests;
-- automated Kp causality tests;
-- full real-data OMNI → Kp integration smoke test.
-
-## 14. Development Order
+## 12. Development Order
 
 ```text
 Frozen Protocol
@@ -173,6 +229,8 @@ Data Contract
 OMNI / Geomagnetic-Index Audit
       ↓
 CME Availability Audit
+      ↓
+Primary Source Universe Frozen
       ↓
 Event / Alert Implementation
       ↓
@@ -189,6 +247,20 @@ Protected Final Test
 Scientific Audit
 ```
 
-## 15. Status
+## 13. Reproducibility
 
-This repository is currently in **Phase 0 implementation and causal-data validation**. OMNI ingestion and Kp causal normalization are implemented and validated. CME availability, event/alert implementation, the complete causal feature pipeline, and downstream model-development phases remain pending.
+The project preserves source-semantic audits, protocol versions, configuration, canonical definitions, source loaders, causality tests, and audit scripts.
+
+Historical protocol versions remain unchanged.
+
+CDAW/LASCO code is retained as reproducible evidence supporting the Phase 0.3 exclusion decision.
+
+## 14. Current Status
+
+The repository is currently in **Phase 0 implementation and causal-data validation**.
+
+OMNI ingestion, Kp causal normalization, AE/Dst availability auditing, and the CME availability/causality audit are complete.
+
+The primary predictor universe is frozen to **OMNI solar-wind measurements plus causal Kp history**.
+
+Event/alert implementation, the complete causal feature pipeline, global leakage validation, and downstream model-development phases remain pending.

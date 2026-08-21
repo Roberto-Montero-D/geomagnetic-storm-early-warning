@@ -1,12 +1,13 @@
 # Geomagnetic Storm Early Warning System
 # Central Project Configuration
-# Protocol: MASTER_PROTOCOL_v1.2
-# Protocol status: Frozen / Phase 0 Amendment
-# The master protocol is the source of truth.
+#
+# Protocol: MASTER_PROTOCOL_v1.3.md
+# Protocol status: Frozen / Phase 0.3 Amendment
+# -------------------------------------------------------------------
 
 project:
   name: "Geomagnetic Storm Early Warning System"
-  protocol_version: "1.2"
+  protocol_version: "1.3"
   protocol_status: "frozen"
 
 target:
@@ -23,46 +24,45 @@ operational:
   max_FAR_per_day: 0.2
 
 temporal:
-  information_cutoff: "t - 1h"
-
-  omni:
-    raw_timestamp_represents: "period_start"
-    period_duration_hours: 1
-    period_end_rule: "raw_timestamp + 1h"
-    eligibility_rule: "period_end <= t - 1h"
-    timestamp_convention_verified: true
-
-  kp:
-    source_resolution_hours: 3
-    raw_encoding: "Kp_x10"
-    repeated_hourly_in_omni: true
-    availability_method: "completed_interval_asof"
-    asof_rule: "interval_end <= query_time"
-    lags_hours: [1, 3, 6, 12, 24]
-    historical_nowcast_reconstructed: false
-    availability_policy_verified: true
-
-geomagnetic_indices:
-  ae:
-    ingest_raw: true
-    primary_causal_feature: false
-    exclusion_reason: "retrospective product version not demonstrably available at historical prediction time"
-  dst:
-    ingest_raw: true
-    primary_causal_feature: false
-    exclusion_reason: "retrospective product version not demonstrably available at historical prediction time"
+  latest_allowed_observation: "t - 1h"
+  omni_raw_timestamp_semantics: "period_start"
+  omni_period_duration_hours: 1
+  eligibility_rule: "period_end <= prediction_time - 1h"
+  timestamp_convention_verified: true
 
 splits:
-  initial_train: {start_year: 1996, end_year: 2016}
-  validation_1: {start_year: 2017, end_year: 2018}
-  train_2: {start_year: 1996, end_year: 2018}
-  validation_2: {start_year: 2019, end_year: 2020}
-  train_3: {start_year: 1996, end_year: 2020}
-  validation_3: {start_year: 2021, end_year: 2021}
-  final_test: {start_year: 2022, end_year: 2025}
+  initial_train:
+    start_year: 1996
+    end_year: 2016
+  validation_1:
+    start_year: 2017
+    end_year: 2018
+  train_2:
+    start_year: 1996
+    end_year: 2018
+  validation_2:
+    start_year: 2019
+    end_year: 2020
+  train_3:
+    start_year: 1996
+    end_year: 2020
+  validation_3:
+    start_year: 2021
+    end_year: 2021
+  final_test:
+    start_year: 2022
+    end_year: 2025
 
 features:
-  layers: [raw, rolling, persistence, dynamics, cme, interactions]
+  primary_source_universe:
+    - omni_solar_wind
+    - causal_kp_history
+  layers:
+    - raw
+    - rolling
+    - persistence
+    - dynamics
+    - interactions
   raw_primary:
     - bz_gsm
     - bt
@@ -74,15 +74,92 @@ features:
     - kp_lag_6h
     - kp_lag_12h
     - kp_lag_24h
-  raw_ingested_but_excluded_from_primary: [ae, dst]
+  raw_ingested_but_excluded_from_primary:
+    - ae
+    - dst
+  external_sources_excluded_from_primary:
+    - cdaw_lasco_cme
+
+kp:
+  raw_encoding: "Kp x 10 integer"
+  canonical_interval_hours: 3
+  predictor_mapping: "kp_asof"
+  rule: "interval_end <= query_time"
+  lags_hours: [1, 3, 6, 12, 24]
+  target_uses_retrospective_ground_truth: true
+
+geomagnetic_indices:
+  ae:
+    raw_ingestion: true
+    primary_causal_feature: false
+  dst:
+    raw_ingestion: true
+    primary_causal_feature: false
+
+cme:
+  source: "SOHO/LASCO CDAW"
+  phase_0_3_audited: true
+  primary_causal_feature: false
+  exclusion_reason: >
+    Timestamped LASCO height-time measurements support causal measurement
+    reconstruction after a CME candidate is defined, but the retrospectively
+    curated CDAW candidate-event universe does not provide uniform historical
+    availability semantics across 1996-2025.
+  raw_research_access: true
+  audit_code_retained: true
+  retrospective_analysis_allowed: true
+  future_protocol_extension_allowed: true
+  final_catalog_predictors_allowed: false
+  reconstructed_kinematics_in_primary_allowed: false
+  cme_counts_in_primary_allowed: false
+
+data_coverage:
+  primary_start_year: 1996
+  primary_end_year: 2025
+  cme_cdaw_audit:
+    successful_yht_records: 42422
+    failed_records: 4
+    retrospective_insertions: 3410
+    provisional_non_inserted_candidates: 39012
+    trajectories_ge_2_points: 42346
+    trajectories_ge_3_points: 41705
+    trajectories_ge_4_points: 39900
+    trajectories_ge_5_points: 37394
+    fraction_ge_3_points: 0.983098
+    c2_only: 14838
+    c3_only: 545
+    c2_c3: 27039
+    duplicate_timestamp_trajectories: 21
+    nonmonotonic_trajectories: 17
+    invalid_height_trajectories: 0
+    third_point_median_hours: 0.408056
+    third_point_p75_hours: 0.796667
+    third_point_p90_hours: 1.020833
+    third_point_p95_hours: 1.4
+    fraction_third_point_within_1h: 0.880470
+    fraction_third_point_within_3h: 0.993070
+    fraction_third_point_within_6h: 0.998945
+    fraction_third_point_within_12h: 0.999952
+    known_failed_months:
+      - "1998-07"
+      - "1998-08"
+      - "1998-09"
+      - "1999-01"
 
 models:
-  baselines: [persistence, physical, logistic, ExtraTrees]
-  candidates: [ExtraTrees, LightGBM, XGBoost]
+  baselines:
+    - persistence
+    - physical
+    - logistic
+    - ExtraTrees
+  candidates:
+    - ExtraTrees
+    - LightGBM
+    - XGBoost
 
 imbalance:
   strategies:
-    - {name: none}
+    - name: none
     - name: class_weighting
       pos_weight: [1, 3, 5, 10, 20, 50]
     - name: random_undersampling
@@ -91,7 +168,7 @@ imbalance:
       k: [3, 5, 7]
     - name: borderline_smote
       k: [3, 5, 7]
-    - {name: smote_enn}
+    - name: smote_enn
 
 model_selection:
   ExtraTrees:
@@ -116,7 +193,7 @@ threshold_stability:
   far_per_day_max: 0.20
 
 phase_7:
-  # Generalization experiments for the frozen primary system; not independently re-optimized tracks.
+  source_universe_frozen: true
   experiments:
     - {H: 3, T: 5}
     - {H: 6, T: 5}
@@ -130,30 +207,17 @@ final_test:
   end_year: 2025
   protected: true
   single_use: true
-
-data_coverage:
-  omni:
-    start: "1996-01-01 00:00"
-    end: "2025-12-31 23:00"
-    hourly_rows: 262992
-    missing_timestamps: 0
-    duplicate_timestamps: 0
-  kp:
-    canonical_intervals: 87664
-    missing_intervals: 0
+  source_universe_frozen: true
 
 phase_0:
   omni_timestamp_verified: true
-  omni_loader_verified: true
-  omni_real_data_smoke_test_passed: true
   kp_timestamp_verified: true
-  kp_availability_policy_verified: true
-  kp_causality_tests_passing: true
-  kp_real_data_smoke_test_passed: true
-  ae_availability_audited: true
-  dst_availability_audited: true
+  ae_dst_availability_audited: true
   ae_dst_primary_exclusion_frozen: true
-  cme_availability_verified: false
+  cme_availability_audited: true
+  cme_measurement_causality_feasible: true
+  cme_candidate_event_causality_sufficient_for_primary: false
+  cme_primary_exclusion_frozen: true
   temporal_cutoff_tested: false
   event_definition_tested: false
   alert_definition_tested: false
