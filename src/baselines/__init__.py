@@ -17,6 +17,12 @@ from .physical import (
     predict_physical,
     predict_physical_for_index,
 )
+from .logistic import (
+    LOGISTIC_FEATURES,
+    LogisticFoldResult,
+    fit_logistic_fold,
+    make_logistic_pipeline,
+)
 
 __all__ = [
     "DEVELOPMENT_FOLD_NAMES",
@@ -30,4 +36,8 @@ __all__ = [
     "PHYSICAL_FEATURES",
     "predict_physical",
     "predict_physical_for_index",
+    "LOGISTIC_FEATURES",
+    "LogisticFoldResult",
+    "fit_logistic_fold",
+    "make_logistic_pipeline",
 ]
