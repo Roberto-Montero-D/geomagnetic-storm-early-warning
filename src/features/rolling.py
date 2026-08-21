@@ -29,7 +29,6 @@ from src.features.raw import (
     PRIMARY_OMNI_FILL_VALUES,
 )
 from src.temporal.cutoff import (
-    DEFAULT_INTERVAL_DURATION,
     information_cutoff,
     interval_end_times,
 )
@@ -114,8 +113,10 @@ def build_rolling_features(
 
     if not windows_hours:
         raise ValueError("windows_hours must not be empty.")
-    if any((not isinstance(w, int)) or isinstance(w, bool) or w <= 0
-           for w in windows_hours):
+    if any(
+        (not isinstance(w, int)) or isinstance(w, bool) or w <= 0
+        for w in windows_hours
+    ):
         raise ValueError("windows_hours must contain positive integers.")
     if len(set(windows_hours)) != len(windows_hours):
         raise ValueError("windows_hours must be unique.")
@@ -137,8 +138,6 @@ def build_rolling_features(
         [information_cutoff(t) for t in prediction_index]
     )
     audit["maximum_rolling_information_time"] = pd.NaT
-
-    ends_np = ends.to_numpy()
 
     for row_i, t in enumerate(prediction_index):
         cutoff = information_cutoff(t)

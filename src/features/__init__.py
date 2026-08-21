@@ -1,5 +1,17 @@
 """Causal feature construction."""
 
+from .dynamics import (
+    DYNAMIC_DELTAS_HOURS,
+    DYNAMIC_FEATURE_COLUMNS,
+    DYNAMIC_SLOPE_HOURS,
+    build_dynamic_features,
+)
+from .persistence import (
+    BZ_PERSISTENCE_THRESHOLDS,
+    PERSISTENCE_FEATURE_COLUMNS,
+    SPEED_PERSISTENCE_THRESHOLDS,
+    build_persistence_features,
+)
 from .raw import (
     PRIMARY_OMNI_COLUMNS,
     PRIMARY_OMNI_FILL_VALUES,
@@ -22,4 +34,12 @@ __all__ = [
     "ROLLING_WINDOWS_HOURS",
     "build_rolling_features",
     "rolling_feature_names",
+    "BZ_PERSISTENCE_THRESHOLDS",
+    "SPEED_PERSISTENCE_THRESHOLDS",
+    "PERSISTENCE_FEATURE_COLUMNS",
+    "build_persistence_features",
+    "DYNAMIC_DELTAS_HOURS",
+    "DYNAMIC_SLOPE_HOURS",
+    "DYNAMIC_FEATURE_COLUMNS",
+    "build_dynamic_features",
 ]
