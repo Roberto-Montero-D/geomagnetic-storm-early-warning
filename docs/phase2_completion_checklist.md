@@ -100,13 +100,13 @@
 - [x] Audit result artifacts for Final Test leakage and metric consistency.
 - [x] Confirm selected B2/B3 baseline thresholds satisfy the frozen FAR/day rule.
 - [x] Confirm no protected 2022–2025 outcome-derived information appears in Phase 2 artifacts.
-- [ ] Run the complete test suite after the empirical runner is added.
-- [ ] Set `full_suite_passing_at_closure: true`.
-- [ ] Set `empirical_development_run_complete: true`.
-- [ ] Set `empirical_results_audited: true`.
-- [ ] Set `phase_2_complete: true`.
-- [ ] Update README status from implementation complete to Phase 2 complete.
-- [ ] Begin Phase 3 only after all items above are complete.
+- [x] Run the complete test suite after the empirical runner is added.
+- [x] Set `full_suite_passing_at_closure: true`.
+- [x] Set `empirical_development_run_complete: true`.
+- [x] Set `empirical_results_audited: true`.
+- [x] Set `phase_2_complete: true`.
+- [x] Update README status from implementation complete to Phase 2 complete.
+- [x] Phase 2 closure conditions satisfied; Phase 3 may begin.
 
 ## Closure Rule
 
@@ -114,3 +114,9 @@ Phase 2 is formally complete only when the baseline implementation,
 development-only empirical run, result audit, documentation/configuration, and
 full test suite are all complete without accessing protected Final Test
 outcomes.
+
+## Closure Record
+
+Phase 2 was formally closed only after the frozen B0-B3 implementations were completed, B1/B3 configuration gaps were resolved before empirical performance inspection, development-only operational threshold handling was audited, 2022-2025 Final Test exclusion was enforced, the official real-data B0-B3 development experiment completed, selected B2/B3 baseline-evaluation thresholds were audited against the frozen FAR/day constraint, result artifacts were audited, and the complete repository test suite passed.
+
+The protected Final Test remains locked.

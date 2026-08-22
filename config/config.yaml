@@ -325,5 +325,5 @@ phase_2:
   documentation_synced: true
   empirical_development_run_complete: true
   empirical_results_audited: true
-  full_suite_passing_at_closure: false
-  phase_2_complete: false
+  full_suite_passing_at_closure: true
+  phase_2_complete: true
