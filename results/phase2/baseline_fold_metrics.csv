@@ -1,0 +1,13 @@
+fold,baseline,threshold,event_recall,false_alarm_rate_per_day,median_lead_time,n_alert_episodes,n_false_alarm_episodes,n_early_detections,n_late_detections,valid_exposure_hours
+screening,B0_persistence,0.5,0.5681818181818182,0.027504011001604402,0 days 05:00:00,56,20,3,33,17452
+screening,B1_physical,0.5,0.5,0.01925280770112308,0 days 03:30:00,40,14,4,22,17452
+screening,B2_logistic,0.07,0.5,0.2502865001146001,0 days 03:00:00,206,182,11,13,17452
+screening,B3_extratrees,0.07,0.45454545454545453,0.24341049736419895,0 days 03:00:00,197,177,10,10,17452
+walk_forward_1,B0_persistence,0.5,0.4,0.01238390092879257,,15,9,0,6,17442
+walk_forward_1,B1_physical,0.5,0.4,0.009631922944616443,0 days 04:00:00,15,7,2,6,17442
+walk_forward_1,B2_logistic,0.07,0.5333333333333333,0.1128310973512212,0 days 03:00:00,90,82,4,4,17442
+walk_forward_1,B3_extratrees,0.07,0.6666666666666666,0.108703130374957,0 days 03:30:00,89,79,6,4,17442
+walk_forward_2,B0_persistence,0.5,0.3125,0.03131301150515953,,16,11,0,5,8431
+walk_forward_2,B1_physical,0.5,0.0625,0.011386549638239828,,6,4,0,2,8431
+walk_forward_2,B2_logistic,0.07,0.8125,0.2191910805361167,0 days 03:30:00,91,77,6,8,8431
+walk_forward_2,B3_extratrees,0.07,0.8125,0.20495789348831692,0 days 04:00:00,85,72,5,8,8431

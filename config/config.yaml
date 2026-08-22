@@ -323,7 +323,7 @@ phase_2:
   cross_fold_evaluation_implemented: true
   cross_fold_final_test_guard_tested: true
   documentation_synced: true
-  empirical_development_run_complete: false
-  empirical_results_audited: false
+  empirical_development_run_complete: true
+  empirical_results_audited: true
   full_suite_passing_at_closure: false
   phase_2_complete: false

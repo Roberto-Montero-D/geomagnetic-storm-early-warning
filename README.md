@@ -1,6 +1,6 @@
 # Geomagnetic Storm Early Warning System
 
-**Status:** Protocol Frozen — Phases 0 and 1 Complete; Phase 2 Implementation Complete, empirical baseline run pending  
+**Status:** Protocol Frozen — Phases 0 and 1 Complete; Phase 2 Implementation and Empirical Baseline Run Complete; final closure test pending  
 **Protocol:** `MASTER_PROTOCOL_v1.3.md`  
 **Primary Horizon:** 6 hours  
 **Primary Storm Threshold:** Kp >= 5
@@ -76,7 +76,7 @@ Implemented Phase 2 infrastructure includes:
 - fold-preserving cross-fold FAR evaluation;
 - explicit rejection of protected Final Test timestamps in Phase 2 train and validation inputs.
 
-Phase 2 implementation completion does **not** yet mean the official empirical baseline tables have been generated. That reproducible development-only experiment is the remaining closure step.
+The official development-only Phase 2 baseline tables have now been generated and audited. Formal Phase 2 closure remains pending only until the final complete test-suite run succeeds."
 
 ## 4. Canonical Target
 
@@ -175,7 +175,9 @@ The definitive global OOF operational threshold procedure remains reserved for *
 Phase 0 — causality and temporal infrastructure     COMPLETE
 Phase 1 — dataset construction and temporal splits COMPLETE
 Phase 2 — baseline implementation                  IMPLEMENTED
-          empirical development run                PENDING
+          empirical development run                COMPLETE
+          results audit                            COMPLETE
+          final closure test                       PENDING
 Phase 3 — feature screening                        PENDING
 Phase 4 — imbalance experiments                    PENDING
 Phase 5 — model selection                          PENDING
@@ -194,6 +196,7 @@ docs/phase2_baseline_configuration_freeze.md
 docs/phase2_b1_protocol_gap.md
 docs/phase2_b3_protocol_gap.md
 docs/phase2_completion_checklist.md
+docs/phase2_baseline_results.md
 ```
 
 The two Phase 2 protocol-gap documents are retained as historical decision records and are marked resolved by the baseline configuration freeze.
@@ -202,4 +205,4 @@ Historical protocol versions remain unchanged. `MASTER_PROTOCOL_v1.3.md` is not 
 
 ## 12. Next Step
 
-Run the reproducible, development-only Phase 2 baseline experiment, audit the generated artifacts for leakage and consistency, run the full test suite, and then formally close Phase 2 before beginning Phase 3.
+Run the complete test suite one final time. If it passes, update the final Phase 2 closure flags and mark Phase 2 COMPLETE before beginning Phase 3.

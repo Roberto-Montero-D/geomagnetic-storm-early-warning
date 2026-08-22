@@ -94,12 +94,12 @@
 
 ## 7. Remaining Closure Items
 
-- [ ] Add reproducible real-data Phase 2 baseline runner.
-- [ ] Run B0–B3 on the real protected development folds.
-- [ ] Save development-only result artifacts.
-- [ ] Audit result artifacts for Final Test leakage and metric consistency.
-- [ ] Confirm selected B2/B3 baseline thresholds satisfy the frozen FAR/day rule.
-- [ ] Confirm no protected 2022–2025 outcome-derived information appears in Phase 2 artifacts.
+- [x] Add reproducible real-data Phase 2 baseline runner.
+- [x] Run B0–B3 on the real protected development folds.
+- [x] Save development-only result artifacts.
+- [x] Audit result artifacts for Final Test leakage and metric consistency.
+- [x] Confirm selected B2/B3 baseline thresholds satisfy the frozen FAR/day rule.
+- [x] Confirm no protected 2022–2025 outcome-derived information appears in Phase 2 artifacts.
 - [ ] Run the complete test suite after the empirical runner is added.
 - [ ] Set `full_suite_passing_at_closure: true`.
 - [ ] Set `empirical_development_run_complete: true`.
