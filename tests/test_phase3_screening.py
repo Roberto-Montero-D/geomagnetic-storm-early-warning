@@ -64,7 +64,7 @@ def test_screening_rejects_final_test_validation():
     augmented=pd.concat([dataset,extra])
     splits=assign_temporal_periods(augmented.index)
     bad=DevelopmentFold("screening",fold.train_index,final)
-    with pytest.raises(ValueError,match="protected Final Test"):
+    with pytest.raises(ValueError,match="validation_1"):
         evaluate_screening_experiment(
             augmented,bad,_events(),splits,"A",thresholds=[0.5]
         )
@@ -80,7 +80,7 @@ def test_screening_rejects_later_validation_period():
     augmented=pd.concat([dataset,extra])
     splits=assign_temporal_periods(augmented.index)
     bad=DevelopmentFold("screening",fold.train_index,later)
-    with pytest.raises(ValueError,match="2017-2018"):
+    with pytest.raises(ValueError, match="validation_1"):
         evaluate_screening_experiment(
             augmented,bad,_events(),splits,"A",thresholds=[0.5]
         )

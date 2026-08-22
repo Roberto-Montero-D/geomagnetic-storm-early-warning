@@ -13,7 +13,11 @@ from sklearn.metrics import average_precision_score
 
 from src.baselines.extratrees import make_extratrees_model
 from src.baselines.framework import DevelopmentFold, get_development_xy
-from src.dataset.temporal_splits import PERIOD_FINAL_TEST
+from src.dataset.temporal_splits import (
+    PERIOD_FINAL_TEST,
+    PERIOD_INITIAL_TRAIN,
+    PERIOD_VALIDATION_1,
+)
 from src.evaluation.operational import evaluate_operational_series
 from src.evaluation.threshold_selection import (
     DEFAULT_MAX_FAR_PER_DAY,
@@ -73,6 +77,19 @@ def _validate_screening_fold(
                 f"screening {role} contains timestamps absent from splits."
             )
         periods = splits.loc[index, "period"]
+        train_periods = splits.loc[fold.train_index, "period"]
+        validation_periods = splits.loc[fold.validation_index, "period"]
+
+        if not train_periods.eq(PERIOD_INITIAL_TRAIN).all():
+            raise ValueError(
+                "Phase 3 screening train must contain only initial_train rows."
+            )
+
+        if not validation_periods.eq(PERIOD_VALIDATION_1).all():
+            raise ValueError(
+                "Phase 3 screening validation must contain only validation_1 rows."
+            )
+
         if (periods == PERIOD_FINAL_TEST).any():
             raise ValueError(
                 f"screening {role} touches the protected Final Test."
@@ -133,10 +150,20 @@ def _select_single_fold_threshold(
     *,
     thresholds,
     max_far_per_day: float,
+    
     cooldown_hours: int,
     horizon_hours: int,
 ) -> tuple[float | None,pd.DataFrame]:
     thresholds=_validate_threshold_grid(thresholds)
+    try:
+        max_far = float(max_far_per_day)
+    except (TypeError, ValueError) as exc:
+        raise TypeError("max_far_per_day must be numeric.") from exc
+
+    if not np.isfinite(max_far) or max_far < 0:
+        raise ValueError(
+            "max_far_per_day must be finite and non-negative."
+        )
     rows=[]
     for threshold in thresholds:
         _,metrics=evaluate_operational_series(
@@ -152,7 +179,7 @@ def _select_single_fold_threshold(
             "event_recall":metrics.event_recall,
             "false_alarm_rate_per_day":far,
             "far_feasible":bool(
-                not pd.isna(far) and far <= max_far_per_day
+                not pd.isna(far) and far <= max_far
             ),
         })
     table=pd.DataFrame(rows)
