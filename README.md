@@ -1,6 +1,6 @@
 # Geomagnetic Storm Early Warning System
 
-**Status:** Protocol Frozen — Phases 0 and 1 Complete; Phase 2 Next  
+**Status:** Protocol Frozen — Phases 0 and 1 Complete; Phase 2 Implementation Complete, empirical baseline run pending  
 **Protocol:** `MASTER_PROTOCOL_v1.3.md`  
 **Primary Horizon:** 6 hours  
 **Primary Storm Threshold:** Kp >= 5
@@ -13,7 +13,7 @@ The operational question is:
 
 > Given only information that would have been available at prediction time `t`, can the system issue a reliable warning that geomagnetic storm conditions will occur within the next `H` hours?
 
-Phase 0 froze the causal predictor/target infrastructure. Phase 1 now freezes the canonical prediction grid, row-preserving dataset assembly, supervised-row status, temporal development folds, Final Test isolation, and protected descriptive auditing.
+Phase 0 froze the causal predictor/target infrastructure. Phase 1 froze the canonical prediction grid, row-preserving dataset assembly, supervised-row status, temporal development folds, Final Test isolation, and protected descriptive auditing. Phase 2 now implements the frozen baseline family and its development-only operational evaluation infrastructure.
 
 The primary predictor universe remains:
 
@@ -61,6 +61,22 @@ Completed Phase 1 infrastructure includes:
 - structural-only Final Test auditing with outcome-derived fields redacted.
 
 Phase 1 completion refers to tested infrastructure. It does **not** claim that empirical full-dataset counts, prevalence, or model results have already been inspected.
+
+### Phase 2 — frozen baselines and development evaluation
+
+Implemented Phase 2 infrastructure includes:
+
+- protected development-fold baseline framework;
+- B0 persistence baseline;
+- B1 physical baseline with frozen `Bz < -5 nT AND V > 500 km/s`;
+- B2 unbalanced Logistic Regression on raw primary predictors;
+- B3 unbalanced ExtraTrees on raw primary predictors with frozen `n_estimators=100`, `max_depth=10`;
+- canonical alert/event operational evaluation reuse;
+- development-only baseline threshold handling for probabilistic baselines;
+- fold-preserving cross-fold FAR evaluation;
+- explicit rejection of protected Final Test timestamps in Phase 2 train and validation inputs.
+
+Phase 2 implementation completion does **not** yet mean the official empirical baseline tables have been generated. That reproducible development-only experiment is the remaining closure step.
 
 ## 4. Canonical Target
 
@@ -137,33 +153,53 @@ Before Phase 8, Final Test auditing is structural only. Allowed diagnostics incl
 
 The Phase 1 audit API redacts Final Test outcome-derived fields such as target-known counts, supervised eligibility, positive/negative counts, and target prevalence. Development periods may expose those statistics.
 
-## 9. Current Project Status
+Phase 2 adds downstream defense in depth: the cross-fold baseline evaluator independently rejects any training or validation index touching the protected Final Test.
+
+## 9. Phase 2 Baseline Evaluation Thresholds
+
+B0 and B1 are deterministic binary baselines and use a fixed adapter threshold of `0.5` only to pass their `0/1` outputs through the common alert interface.
+
+B2 and B3 produce probabilities. During Phase 2 baseline comparison, development-only baseline-evaluation thresholds may be selected under the frozen operational constraint:
+
+```text
+FAR/day <= 0.2
+```
+
+These Phase 2 thresholds exist only to make probabilistic baselines operationally comparable to B0/B1. They are **not** the final production/global OOF threshold.
+
+The definitive global OOF operational threshold procedure remains reserved for **Phase 6**, exactly as specified in `MASTER_PROTOCOL_v1.3.md`.
+
+## 10. Current Project Status
 
 ```text
 Phase 0 — causality and temporal infrastructure     COMPLETE
 Phase 1 — dataset construction and temporal splits COMPLETE
-Phase 2 — baselines                                NEXT
+Phase 2 — baseline implementation                  IMPLEMENTED
+          empirical development run                PENDING
 Phase 3 — feature screening                        PENDING
 Phase 4 — imbalance experiments                    PENDING
 Phase 5 — model selection                          PENDING
 Phase 6 — OOF operational threshold selection      PENDING
-Phase 7 — horizon/severity experiments              PENDING
+Phase 7 — horizon/severity experiments             PENDING
 Phase 8 — protected Final Test                      LOCKED
 Phase 9 — interpretation/scientific audit           PENDING
 ```
 
-## 10. Canonical Documentation
+## 11. Canonical Documentation
 
-Phase 0 documents remain canonical. Phase 1 adds:
+Phase 0 and Phase 1 documents remain canonical. Phase 2 adds:
 
 ```text
-docs/dataset_contract.md
-docs/temporal_splits.md
-docs/phase1_completion_checklist.md
+docs/phase2_baseline_configuration_freeze.md
+docs/phase2_b1_protocol_gap.md
+docs/phase2_b3_protocol_gap.md
+docs/phase2_completion_checklist.md
 ```
 
-Historical protocol versions remain unchanged. `MASTER_PROTOCOL_v1.3.md` already contains the frozen Phase 1 temporal split and feature definitions and is not rewritten merely to record implementation completion.
+The two Phase 2 protocol-gap documents are retained as historical decision records and are marked resolved by the baseline configuration freeze.
 
-## 11. Next Step
+Historical protocol versions remain unchanged. `MASTER_PROTOCOL_v1.3.md` is not rewritten merely to record implementation completion.
 
-Phase 2 implements the pre-specified baselines on the frozen Phase 1 development infrastructure. No protected Final Test outcome statistics are inspected during baseline development.
+## 12. Next Step
+
+Run the reproducible, development-only Phase 2 baseline experiment, audit the generated artifacts for leakage and consistency, run the full test suite, and then formally close Phase 2 before beginning Phase 3.

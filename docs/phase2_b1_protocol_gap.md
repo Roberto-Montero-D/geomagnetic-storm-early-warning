@@ -1,23 +1,35 @@
 # Phase 2.3 Protocol Gap — B1 Numerical Thresholds
 
-`MASTER_PROTOCOL_v1.3.md` freezes B1 structurally as:
+**Status:** RESOLVED
 
-    Bz < -X AND V > Y
+`MASTER_PROTOCOL_v1.3.md` froze B1 structurally as:
 
-but does not specify numerical values for `X` or `Y`, nor does it specify a
-candidate grid or a selection procedure for these parameters.
+```text
+Bz < -X AND V > Y
+```
 
-Therefore Phase 2.3 implementation intentionally:
+but did not specify numerical values for `X` or `Y`, nor a candidate grid or a
+selection procedure for those parameters.
 
-- implements the rule exactly;
-- uses only canonical causal `bz_gsm` and `speed`;
-- requires X and Y explicitly;
-- does not invent default values;
-- does not search a grid;
-- does not optimize using validation results;
-- does not touch Final Test outcomes.
+During Phase 2 implementation this was treated as a methodological gap rather
+than silently choosing values from observed performance.
 
-Before B1 can receive an official empirical baseline result, the project must
-resolve this pre-existing protocol gap without using performance results to
-choose the rule. That resolution should be recorded as a protocol clarification
-or amendment before B1 evaluation.
+The gap was resolved **before official empirical Phase 2 baseline evaluation**
+in:
+
+```text
+docs/phase2_baseline_configuration_freeze.md
+```
+
+The frozen primary B1 configuration is now:
+
+```text
+Bz < -5 nT
+AND
+V > 500 km/s
+```
+
+Both inequalities remain strict.
+
+The original gap record is retained for provenance. It no longer represents an
+open methodological issue.

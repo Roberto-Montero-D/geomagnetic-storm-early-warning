@@ -178,6 +178,32 @@ models:
     - logistic
     - ExtraTrees
 
+  baseline_configuration:
+    persistence:
+      storm_threshold_T: 5
+      predictor: "kp_lag_1h"
+      frozen: true
+
+    physical:
+      bz_magnitude_nt: 5.0
+      speed_threshold_km_s: 500.0
+      rule: "bz_gsm < -5 AND speed > 500"
+      frozen: true
+
+    logistic:
+      feature_scope: "raw_primary"
+      scaling: "StandardScaler"
+      class_weight: null
+      frozen_structure: true
+
+    ExtraTrees:
+      feature_scope: "raw_primary"
+      n_estimators: 100
+      max_depth: 10
+      class_weight: null
+      random_state: 42
+      frozen: true
+
   candidates:
     - ExtraTrees
     - LightGBM
@@ -220,6 +246,9 @@ threshold_selection:
   maximum: 0.99
   step: 0.01
   selection_constraint: "FAR/day <= 0.2"
+  phase_2_baseline_thresholds_are_final_oof: false
+  phase_2_baseline_threshold_purpose: "development-only operational baseline comparability"
+  definitive_global_oof_phase: 6
 
 threshold_stability:
   far_per_day_min: 0.15
@@ -280,3 +309,21 @@ phase_1:
   dataset_contract_documented: true
   temporal_split_contract_documented: true
   phase_1_complete: true
+
+phase_2:
+  protected_baseline_framework_implemented: true
+  b0_persistence_implemented: true
+  b1_physical_implemented: true
+  b1_configuration_frozen: true
+  b2_logistic_implemented: true
+  b3_extratrees_implemented: true
+  b3_configuration_frozen: true
+  operational_adapter_implemented: true
+  baseline_threshold_selection_implemented: true
+  cross_fold_evaluation_implemented: true
+  cross_fold_final_test_guard_tested: true
+  documentation_synced: true
+  empirical_development_run_complete: false
+  empirical_results_audited: false
+  full_suite_passing_at_closure: false
+  phase_2_complete: false
