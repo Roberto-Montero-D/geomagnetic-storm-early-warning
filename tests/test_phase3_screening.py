@@ -64,7 +64,7 @@ def test_screening_rejects_final_test_validation():
     augmented=pd.concat([dataset,extra])
     splits=assign_temporal_periods(augmented.index)
     bad=DevelopmentFold("screening",fold.train_index,final)
-    with pytest.raises(ValueError,match="validation_1"):
+    with pytest.raises(ValueError, match="protected Final Test"):
         evaluate_screening_experiment(
             augmented,bad,_events(),splits,"A",thresholds=[0.5]
         )

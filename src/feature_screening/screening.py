@@ -50,6 +50,9 @@ class Phase3ScreeningResult:
     ranking: pd.DataFrame
     advancing_experiments: tuple[str, ...]
 
+def _progress(enabled: bool, message: str) -> None:
+    if enabled:
+        print(message, flush=True)
 
 def _events_for_validation(
     events: pd.DataFrame,
@@ -76,24 +79,25 @@ def _validate_screening_fold(
             raise ValueError(
                 f"screening {role} contains timestamps absent from splits."
             )
+
         periods = splits.loc[index, "period"]
-        train_periods = splits.loc[fold.train_index, "period"]
-        validation_periods = splits.loc[fold.validation_index, "period"]
-
-        if not train_periods.eq(PERIOD_INITIAL_TRAIN).all():
-            raise ValueError(
-                "Phase 3 screening train must contain only initial_train rows."
-            )
-
-        if not validation_periods.eq(PERIOD_VALIDATION_1).all():
-            raise ValueError(
-                "Phase 3 screening validation must contain only validation_1 rows."
-            )
-
         if (periods == PERIOD_FINAL_TEST).any():
             raise ValueError(
                 f"screening {role} touches the protected Final Test."
             )
+
+    train_periods = splits.loc[fold.train_index, "period"]
+    validation_periods = splits.loc[fold.validation_index, "period"]
+
+    if not train_periods.eq(PERIOD_INITIAL_TRAIN).all():
+        raise ValueError(
+            "Phase 3 screening train must contain only initial_train rows."
+        )
+
+    if not validation_periods.eq(PERIOD_VALIDATION_1).all():
+        raise ValueError(
+            "Phase 3 screening validation must contain only validation_1 rows."
+        )
 
     train_years=set(fold.train_index.year)
     validation_years=set(fold.validation_index.year)
@@ -150,11 +154,13 @@ def _select_single_fold_threshold(
     *,
     thresholds,
     max_far_per_day: float,
-    
     cooldown_hours: int,
     horizon_hours: int,
+    progress: bool = False,
+    experiment: str | None = None,
 ) -> tuple[float | None,pd.DataFrame]:
     thresholds=_validate_threshold_grid(thresholds)
+    total_thresholds = len(thresholds)
     try:
         max_far = float(max_far_per_day)
     except (TypeError, ValueError) as exc:
@@ -165,7 +171,14 @@ def _select_single_fold_threshold(
             "max_far_per_day must be finite and non-negative."
         )
     rows=[]
-    for threshold in thresholds:
+    for number, threshold in enumerate(thresholds, start=1):
+        if progress:
+            label = experiment or "experiment"
+            _progress(
+                True,
+                f"      {label}: threshold "
+                f"{number:02d}/{total_thresholds} (tau={threshold:.2f})",
+            )
         _,metrics=evaluate_operational_series(
             probability,
             events,
@@ -193,12 +206,13 @@ def evaluate_screening_experiment(
     fold: DevelopmentFold,
     events: pd.DataFrame,
     splits: pd.DataFrame,
-    experiment: str,
+    experiment: str | None = None,
     *,
     thresholds=DEFAULT_THRESHOLD_GRID,
     max_far_per_day: float=DEFAULT_MAX_FAR_PER_DAY,
     cooldown_hours: int=3,
     horizon_hours: int=6,
+    progress: bool = False,
 ) -> ScreeningExperimentResult:
     if experiment not in PHASE3_FEATURE_SETS:
         raise ValueError(f"unknown Phase 3 experiment: {experiment}")
@@ -221,6 +235,8 @@ def evaluate_screening_experiment(
         max_far_per_day=max_far_per_day,
         cooldown_hours=cooldown_hours,
         horizon_hours=horizon_hours,
+        progress=progress,
+        experiment=experiment,
     )
 
     if selected is None:
@@ -235,6 +251,12 @@ def evaluate_screening_experiment(
             validation_probability=probability,
             threshold_table=table,
         )
+    
+    _progress(
+        progress,
+        f"    Fitting experiment {experiment} "
+        f"({len(PHASE3_FEATURE_SETS[experiment])} features)...",
+    )
 
     _,metrics=evaluate_operational_series(
         probability,
@@ -300,6 +322,7 @@ def evaluate_phase3_screening(
     splits: pd.DataFrame,
     *,
     thresholds=DEFAULT_THRESHOLD_GRID,
+    progress: bool = False,
     max_far_per_day: float=DEFAULT_MAX_FAR_PER_DAY,
 ) -> Phase3ScreeningResult:
     results={}
@@ -312,6 +335,8 @@ def evaluate_phase3_screening(
             experiment,
             thresholds=thresholds,
             max_far_per_day=max_far_per_day,
+            progress=progress,
         )
+    _progress(progress, "    Ranking A-E screening experiments...")
     ranking,advancing=rank_screening_experiments(results)
     return Phase3ScreeningResult(results,ranking,advancing)
