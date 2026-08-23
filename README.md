@@ -78,9 +78,9 @@ Implemented Phase 2 infrastructure includes:
 
 The official development-only Phase 2 baseline tables were generated and audited, and the complete repository test suite passed afterward. Phase 2 is formally complete.
 
-### Phase 3 — feature Screening
+### Phase 3 — feature screening
 
-"Phase 3 is formally complete. Experiment A (10 raw causal predictors) is frozen as the selected feature set for subsequent phases."
+Phase 3 is formally complete. Experiment A (10 raw causal predictors) is frozen as the selected feature set for subsequent phases.
 
 ## 4. Canonical Target
 
