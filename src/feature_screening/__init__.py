@@ -23,6 +23,13 @@ from .screening import (
     rank_screening_experiments,
 )
 
+from .freeze import (
+    PHASE3_CONFIRMATION_EVIDENCE,
+    PHASE3_SELECTED_EXPERIMENT,
+    PHASE3_SELECTED_FEATURES,
+    PHASE3_SELECTION_STATUS,
+)
+
 __all__ = [
     "PHASE3_ADVANCING_EXPERIMENTS",
     "PHASE3_CONFIRMATION_FOLDS",
@@ -40,4 +47,8 @@ __all__ = [
     "evaluate_phase3_screening",
     "evaluate_screening_experiment",
     "rank_screening_experiments",
+    "PHASE3_CONFIRMATION_EVIDENCE",
+    "PHASE3_SELECTED_EXPERIMENT",
+    "PHASE3_SELECTED_FEATURES",
+    "PHASE3_SELECTION_STATUS",
 ]
