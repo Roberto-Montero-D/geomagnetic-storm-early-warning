@@ -327,3 +327,13 @@ phase_2:
   empirical_results_audited: true
   full_suite_passing_at_closure: true
   phase_2_complete: true
+
+phase_3:
+  contract_frozen: true
+  initial_screening_complete: true
+  screening_results_audited: true
+  confirmation_complete: true
+  confirmation_results_audited: true
+  selected_experiment: "A"
+  selected_feature_count: 10
+  phase_3_complete: true

@@ -1,6 +1,6 @@
 # Geomagnetic Storm Early Warning System
 
-**Status:** Protocol Frozen — Phases 0, 1, and 2 Complete; Phase 3 Next 
+**Status:** Protocol Frozen — Phases 0, 1, 2, and 3 Complete; Phase 4 Next 
 **Protocol:** `MASTER_PROTOCOL_v1.3.md`  
 **Primary Horizon:** 6 hours  
 **Primary Storm Threshold:** Kp >= 5
@@ -77,6 +77,10 @@ Implemented Phase 2 infrastructure includes:
 - explicit rejection of protected Final Test timestamps in Phase 2 train and validation inputs.
 
 The official development-only Phase 2 baseline tables were generated and audited, and the complete repository test suite passed afterward. Phase 2 is formally complete.
+
+### Phase 3 — feature Screening
+
+"Phase 3 is formally complete. Experiment A (10 raw causal predictors) is frozen as the selected feature set for subsequent phases."
 
 ## 4. Canonical Target
 
@@ -175,7 +179,7 @@ The definitive global OOF operational threshold procedure remains reserved for *
 Phase 0 — causality and temporal infrastructure     COMPLETE
 Phase 1 — dataset construction and temporal splits COMPLETE
 Phase 2 — baselines and development evaluation     COMPLETE
-Phase 3 — feature screening                        PENDING
+Phase 3 — feature screening                        COMPLETE
 Phase 4 — imbalance experiments                    PENDING
 Phase 5 — model selection                          PENDING
 Phase 6 — OOF operational threshold selection      PENDING
@@ -194,6 +198,10 @@ docs/phase2_b1_protocol_gap.md
 docs/phase2_b3_protocol_gap.md
 docs/phase2_completion_checklist.md
 docs/phase2_baseline_results.md
+docs/phase3_feature_screening_contract.md
+docs/phase3_initial_screening_results.md
+docs/phase3_feature_selection.md
+docs/phase3_closure.md
 ```
 
 The two Phase 2 protocol-gap documents are retained as historical decision records and are marked resolved by the baseline configuration freeze.
@@ -202,4 +210,4 @@ Historical protocol versions remain unchanged. `MASTER_PROTOCOL_v1.3.md` is not 
 
 ## 12. Next Step
 
-Begin Phase 3 feature screening using only the frozen development framework and without accessing protected 2022–2025 Final Test outcomes.
+Begin Phase 4 imbalance experiments using only PHASE3_SELECTED_FEATURES and without accessing protected 2022–2025 Final Test outcomes.
