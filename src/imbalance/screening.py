@@ -16,6 +16,11 @@ from .contract import (
     PHASE4_EXTRATREES_PARAMS, PHASE4_FEATURES, PHASE4_MAX_FAR_PER_DAY,
 )
 from .strategies import prepare_training_data
+from src.dataset.temporal_splits import (
+    PERIOD_FINAL_TEST,
+    PERIOD_INITIAL_TRAIN,
+    PERIOD_VALIDATION_1,
+)
 
 @dataclass(frozen=True)
 class ImbalanceScreeningResult:
@@ -39,6 +44,55 @@ def _experiment(name):
         return next(x for x in PHASE4_EXPERIMENTS if x.name == name)
     except StopIteration as exc:
         raise ValueError(f"unknown Phase 4 experiment: {name}") from exc
+
+def _validate_phase4_screening_fold(
+    fold: DevelopmentFold,
+    splits: pd.DataFrame,
+) -> None:
+    for role, index in (
+        ("train", fold.train_index),
+        ("validation", fold.validation_index),
+    ):
+        if not index.isin(splits.index).all():
+            raise ValueError(
+                f"Phase 4 screening {role} contains timestamps absent from splits."
+            )
+
+        periods = splits.loc[index, "period"]
+
+        if (periods == PERIOD_FINAL_TEST).any():
+            raise ValueError(
+                f"Phase 4 screening {role} touches the protected Final Test."
+            )
+
+    train_periods = splits.loc[fold.train_index, "period"]
+    validation_periods = splits.loc[fold.validation_index, "period"]
+
+    if not train_periods.eq(PERIOD_INITIAL_TRAIN).all():
+        raise ValueError(
+            "Phase 4 screening train must contain only initial_train rows."
+        )
+
+    if not validation_periods.eq(PERIOD_VALIDATION_1).all():
+        raise ValueError(
+            "Phase 4 screening validation must contain only validation_1 rows."
+        )
+
+    if len(fold.train_index.intersection(fold.validation_index)) != 0:
+        raise ValueError(
+            "Phase 4 screening train and validation indices overlap."
+        )
+
+    if (
+        len(fold.train_index) > 0
+        and len(fold.validation_index) > 0
+        and fold.train_index.max() >= fold.validation_index.min()
+    ):
+        raise ValueError(
+            "Phase 4 screening violates chronological train-before-validation order."
+        )
+
+    
 
 def _fit_experiment(dataset: pd.DataFrame, fold: DevelopmentFold, name: str):
     x_train,y_train,x_val,y_val=get_development_xy(dataset,fold,PHASE4_FEATURES)
@@ -82,11 +136,12 @@ def _threshold_curve(probability,events,thresholds,max_far_per_day,cooldown_hour
     return selected,table
 
 def evaluate_imbalance_experiment(
-    dataset: pd.DataFrame, fold: DevelopmentFold, events: pd.DataFrame,
+    dataset: pd.DataFrame, fold: DevelopmentFold, events: pd.DataFrame, splits: pd.DataFrame,
     experiment: str, *, thresholds=DEFAULT_THRESHOLD_GRID,
     max_far_per_day: float=PHASE4_MAX_FAR_PER_DAY,
     cooldown_hours: int=3, horizon_hours: int=6,
 ) -> ImbalanceScreeningResult:
+    _validate_phase4_screening_fold(fold, splits)
     if experiment not in PHASE4_EXPERIMENT_NAMES:
         raise ValueError(f"unknown Phase 4 experiment: {experiment}")
     probability,y_val=_fit_experiment(dataset,fold,experiment)
@@ -132,13 +187,23 @@ def rank_imbalance_experiments(experiments):
     return ranking.drop(columns="_order"),advancing
 
 def evaluate_phase4_screening(
-    dataset,fold,events,*,thresholds=DEFAULT_THRESHOLD_GRID,
+    dataset,
+    fold,
+    events,
+    splits,
+    *,
+    thresholds=DEFAULT_THRESHOLD_GRID,
     max_far_per_day=PHASE4_MAX_FAR_PER_DAY,
 ):
     results={}
     for name in PHASE4_EXPERIMENT_NAMES:
         results[name]=evaluate_imbalance_experiment(
-            dataset,fold,events,name,thresholds=thresholds,
+            dataset,
+            fold,
+            events,
+            splits,
+            name,
+            thresholds=thresholds,
             max_far_per_day=max_far_per_day,
         )
     ranking,advancing=rank_imbalance_experiments(results)
