@@ -1,6 +1,6 @@
 # Geomagnetic Storm Early Warning System
 
-**Status:** Protocol Frozen — Phases 0, 1, 2, and 3 Complete; Phase 4 Next 
+**Status:** Protocol Frozen — Phases 0–4 Complete; Phase 5 In Progress
 **Protocol:** `MASTER_PROTOCOL_v1.3.md`  
 **Primary Horizon:** 6 hours  
 **Primary Storm Threshold:** Kp >= 5
@@ -180,8 +180,8 @@ Phase 0 — causality and temporal infrastructure     COMPLETE
 Phase 1 — dataset construction and temporal splits COMPLETE
 Phase 2 — baselines and development evaluation     COMPLETE
 Phase 3 — feature screening                        COMPLETE
-Phase 4 — imbalance experiments                    PENDING
-Phase 5 — model selection                          PENDING
+Phase 4 — imbalance experiments                    COMPLETE
+Phase 5 — model selection                          IN PROGRESS
 Phase 6 — OOF operational threshold selection      PENDING
 Phase 7 — horizon/severity experiments             PENDING
 Phase 8 — protected Final Test                      LOCKED
@@ -210,4 +210,6 @@ Historical protocol versions remain unchanged. `MASTER_PROTOCOL_v1.3.md` is not 
 
 ## 12. Next Step
 
-Begin Phase 4 imbalance experiments using only PHASE3_SELECTED_FEATURES and without accessing protected 2022–2025 Final Test outcomes.
+Begin Phase 5 model selection using only the Phase 3 selected feature set and
+the frozen Phase 4 imbalance treatment (`none`), without accessing protected
+2022–2025 Final Test outcomes.
