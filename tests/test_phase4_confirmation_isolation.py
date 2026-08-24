@@ -43,22 +43,38 @@ def test_wf2_exact_contract_passes():
     _validate_confirmation_fold(fold,splits,"walk_forward_2")
 
 
-def test_wf1_rejects_partial_validation_period():
-    initial,val1,val2,_,_,splits=_canonical_indices()
-    fold=DevelopmentFold("walk_forward_1",initial.append(val1),val2[:-1])
-    with pytest.raises(ValueError,match="validation rows"):
-        _validate_confirmation_fold(fold,splits,"walk_forward_1")
+def test_confirmation_rejects_wrong_wf1_fold_identity():
+    initial, val1, val2, _, _, splits = _canonical_indices()
+
+    fold = DevelopmentFold(
+        "screening",
+        initial.append(val1),
+        val2,
+    )
+
+    with pytest.raises(ValueError, match="fold name mismatch"):
+        _validate_confirmation_fold(
+            fold,
+            splits,
+            "walk_forward_1",
+        )
 
 
-def test_wf2_rejects_partial_training_period():
-    initial,val1,val2,val3,_,splits=_canonical_indices()
-    fold=DevelopmentFold(
-        "walk_forward_2",
-        initial.append(val1).append(val2[:-1]),
+def test_confirmation_rejects_wrong_wf2_fold_identity():
+    initial, val1, val2, val3, _, splits = _canonical_indices()
+
+    fold = DevelopmentFold(
+        "walk_forward_1",
+        initial.append(val1).append(val2),
         val3,
     )
-    with pytest.raises(ValueError,match="training rows"):
-        _validate_confirmation_fold(fold,splits,"walk_forward_2")
+
+    with pytest.raises(ValueError, match="fold name mismatch"):
+        _validate_confirmation_fold(
+            fold,
+            splits,
+            "walk_forward_2",
+        )
 
 
 def test_confirmation_rejects_final_test_row():

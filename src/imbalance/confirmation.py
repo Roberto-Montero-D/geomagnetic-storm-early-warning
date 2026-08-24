@@ -84,21 +84,23 @@ def _validate_confirmation_fold(
 
     train_periods, validation_periods = expected[fold_name]
 
-    expected_train_index = splits.index[
-        splits["period"].isin(train_periods)
-    ]
-    expected_validation_index = splits.index[
-        splits["period"].isin(validation_periods)
-    ]
-
-    if not fold.train_index.equals(expected_train_index):
+    if fold.name != fold_name:
         raise ValueError(
-            f"{fold_name} training rows do not match the frozen temporal contract."
+            f"Phase 4 confirmation fold name mismatch: "
+            f"expected {fold_name!r}, got {fold.name!r}."
         )
 
-    if not fold.validation_index.equals(expected_validation_index):
+    train_actual = set(splits.loc[fold.train_index, "period"])
+    validation_actual = set(splits.loc[fold.validation_index, "period"])
+
+    if train_actual != set(train_periods):
         raise ValueError(
-            f"{fold_name} validation rows do not match the frozen temporal contract."
+            f"{fold_name} training periods do not match the frozen temporal contract."
+        )
+
+    if validation_actual != set(validation_periods):
+        raise ValueError(
+            f"{fold_name} validation periods do not match the frozen temporal contract."
         )
 
     if len(fold.train_index.intersection(fold.validation_index)) != 0:
