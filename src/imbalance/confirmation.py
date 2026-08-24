@@ -48,34 +48,72 @@ class Phase4ConfirmationResult:
 def _exp(name):
     return next(x for x in PHASE4_EXPERIMENTS if x.name==name)
 
-def _validate_confirmation_fold(fold: DevelopmentFold,splits: pd.DataFrame,fold_name: str):
-    expected={
+def _validate_confirmation_fold(
+    fold: DevelopmentFold,
+    splits: pd.DataFrame,
+    fold_name: str,
+) -> None:
+    expected = {
         "walk_forward_1": (
-            {PERIOD_INITIAL_TRAIN,PERIOD_VALIDATION_1},
-            {PERIOD_VALIDATION_2},
+            (PERIOD_INITIAL_TRAIN, PERIOD_VALIDATION_1),
+            (PERIOD_VALIDATION_2,),
         ),
         "walk_forward_2": (
-            {PERIOD_INITIAL_TRAIN,PERIOD_VALIDATION_1,PERIOD_VALIDATION_2},
-            {PERIOD_VALIDATION_3},
+            (PERIOD_INITIAL_TRAIN, PERIOD_VALIDATION_1, PERIOD_VALIDATION_2),
+            (PERIOD_VALIDATION_3,),
         ),
     }
+
     if fold_name not in expected:
         raise ValueError(f"unknown Phase 4 confirmation fold: {fold_name}")
-    for role,index in (("train",fold.train_index),("validation",fold.validation_index)):
+
+    for role, index in (
+        ("train", fold.train_index),
+        ("validation", fold.validation_index),
+    ):
         if not index.isin(splits.index).all():
-            raise ValueError(f"Phase 4 confirmation {role} contains timestamps absent from splits.")
-        periods=set(splits.loc[index,"period"])
-        if PERIOD_FINAL_TEST in periods:
-            raise ValueError(f"Phase 4 confirmation {role} touches the protected Final Test.")
-    train_expected,val_expected=expected[fold_name]
-    if set(splits.loc[fold.train_index,"period"]) != train_expected:
-        raise ValueError(f"{fold_name} training periods do not match frozen contract.")
-    if set(splits.loc[fold.validation_index,"period"]) != val_expected:
-        raise ValueError(f"{fold_name} validation periods do not match frozen contract.")
-    if len(fold.train_index.intersection(fold.validation_index)):
-        raise ValueError("Phase 4 confirmation train and validation overlap.")
-    if fold.train_index.max() >= fold.validation_index.min():
-        raise ValueError("Phase 4 confirmation violates chronological order.")
+            raise ValueError(
+                f"Phase 4 confirmation {role} contains timestamps absent from splits."
+            )
+
+        periods = splits.loc[index, "period"]
+        if periods.eq(PERIOD_FINAL_TEST).any():
+            raise ValueError(
+                f"Phase 4 confirmation {role} touches the protected Final Test."
+            )
+
+    train_periods, validation_periods = expected[fold_name]
+
+    expected_train_index = splits.index[
+        splits["period"].isin(train_periods)
+    ]
+    expected_validation_index = splits.index[
+        splits["period"].isin(validation_periods)
+    ]
+
+    if not fold.train_index.equals(expected_train_index):
+        raise ValueError(
+            f"{fold_name} training rows do not match the frozen temporal contract."
+        )
+
+    if not fold.validation_index.equals(expected_validation_index):
+        raise ValueError(
+            f"{fold_name} validation rows do not match the frozen temporal contract."
+        )
+
+    if len(fold.train_index.intersection(fold.validation_index)) != 0:
+        raise ValueError(
+            "Phase 4 confirmation train and validation overlap."
+        )
+
+    if (
+        len(fold.train_index) > 0
+        and len(fold.validation_index) > 0
+        and fold.train_index.max() >= fold.validation_index.min()
+    ):
+        raise ValueError(
+            "Phase 4 confirmation violates chronological order."
+        )
 
 def evaluate_confirmation_fold(dataset,fold,events,splits,fold_name,experiment,
                                *,thresholds=DEFAULT_THRESHOLD_GRID):
