@@ -40,7 +40,7 @@ from src.model_selection.screening import (
     advance_family_winners,
     evaluate_model_configuration,
 )
-
+from time import perf_counter
 
 def _progress(message: str) -> None:
     print(message, flush=True)
@@ -65,7 +65,9 @@ def build_phase5_screening_inputs(
         omni,
         kp_intervals,
         grid,
+        progress=lambda message: _progress(f"      {message}"),
     )
+
 
     _progress(
         "[5/7] Building row status, temporal splits, and development folds..."
@@ -105,6 +107,7 @@ def evaluate_phase5_screening_with_progress(
         PHASE5_CONFIGURATIONS,
         start=1,
     ):
+        model_start = perf_counter()
         _progress(
             f"    [{i:02d}/{total:02d}] "
             f"{config.family} / {config.config_id}"
@@ -118,7 +121,10 @@ def evaluate_phase5_screening_with_progress(
                 config.config_id,
             )
         )
-
+        _progress(
+                        f"             completed in "
+                        f"{perf_counter() - model_start:.1f} s"
+                    )
         # The evaluator reads the canonical materialized fold directly.
         # Record the exact supplied indices for the post-run equality audit.
         observed_indices[config.config_id] = (

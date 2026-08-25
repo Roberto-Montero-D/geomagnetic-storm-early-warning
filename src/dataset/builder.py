@@ -16,7 +16,7 @@ Those responsibilities belong to later Phase 1 checkpoints.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 import pandas as pd
 
@@ -29,7 +29,7 @@ from src.targets.event_window import (
     DEFAULT_TARGET_THRESHOLD,
     build_event_window_target,
 )
-
+from time import perf_counter
 
 TARGET_COLUMN = "target"
 
@@ -108,6 +108,7 @@ def build_canonical_dataset(
     threshold: float = DEFAULT_TARGET_THRESHOLD,
     horizon_hours: int = DEFAULT_TARGET_HORIZON_HOURS,
     return_audit: bool = False,
+    progress: Callable[[str], None] | None = None,
 ) -> pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame]:
     """Assemble the canonical row-preserving Phase 1 dataset.
 
@@ -130,13 +131,30 @@ def build_canonical_dataset(
     prediction_index = _validate_prediction_times(
         prediction_times
     )
+    dataset_start = perf_counter()
+
+    feature_start = perf_counter()
+    if progress is not None:
+        progress("[dataset 1/3] Building primary causal feature frame...")
 
     features, feature_audit = build_primary_feature_frame(
         omni,
         kp_intervals,
         prediction_index,
         return_audit=True,
+        progress=progress,
     )
+
+    if progress is not None:
+        progress(
+            "[dataset 1/3] Primary causal feature frame complete "
+            f"[{perf_counter() - feature_start:.1f} s]"
+        )
+
+    target_start = perf_counter()
+    if progress is not None:
+        progress("[dataset 2/3] Building future event-window target...")
+
     target, target_audit = build_event_window_target(
         kp_intervals,
         prediction_index,
@@ -144,6 +162,15 @@ def build_canonical_dataset(
         horizon_hours=horizon_hours,
         return_audit=True,
     )
+
+    if progress is not None:
+        progress(
+            "[dataset 2/3] Future event-window target complete "
+            f"[{perf_counter() - target_start:.1f} s]"
+        )
+
+    if progress is not None:
+        progress("[dataset 3/3] Validating and assembling canonical dataset...")
 
     components = {
         "features": features.index,
@@ -186,6 +213,12 @@ def build_canonical_dataset(
     dataset.index.name = "prediction_time"
 
     if not return_audit:
+        if progress is not None:
+            progress(
+                "[dataset 3/3] Canonical dataset complete: "
+                f"{len(dataset):,} rows x {len(dataset.columns)} columns "
+                f"[{perf_counter() - dataset_start:.1f} s total]"
+            )
         return dataset
 
     audit = pd.concat(
@@ -213,5 +246,11 @@ def build_canonical_dataset(
         )
 
     audit.index.name = "prediction_time"
+    if progress is not None:
+        progress(
+            "[dataset 3/3] Canonical dataset complete: "
+            f"{len(dataset):,} rows x {len(dataset.columns)} columns "
+            f"[{perf_counter() - dataset_start:.1f} s total]"
+        )
 
     return dataset, audit

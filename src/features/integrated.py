@@ -18,7 +18,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 import pandas as pd
-
+from collections.abc import Callable
+from time import perf_counter
 from src.features.dynamics import (
     DYNAMIC_FEATURE_COLUMNS,
     build_dynamic_features,
@@ -57,6 +58,7 @@ PRIMARY_FEATURE_COLUMNS = (
 )
 
 
+
 def _validate_manifest() -> None:
     if len(PRIMARY_FEATURE_COLUMNS) != len(set(PRIMARY_FEATURE_COLUMNS)):
         raise AssertionError(
@@ -73,31 +75,61 @@ def build_primary_feature_frame(
     prediction_times: Iterable[pd.Timestamp] | pd.DatetimeIndex,
     *,
     return_audit: bool = False,
+    progress: Callable[[str], None] | None = None,
 ) -> pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame]:
     """Build the complete frozen Phase 0.7 causal feature frame."""
 
-    raw, raw_audit = build_raw_features(
-        omni,
-        kp_intervals,
-        prediction_times,
-        return_audit=True,
+    def _run(label, fn):
+        start = perf_counter()
+        if progress is not None:
+            progress(f"{label}...")
+        result = fn()
+        if progress is not None:
+            progress(
+                f"{label} complete [{perf_counter() - start:.1f} s]"
+            )
+        return result
+
+    raw, raw_audit = _run(
+        "[features 1/5] Building raw features",
+        lambda: build_raw_features(
+            omni,
+            kp_intervals,
+            prediction_times,
+            return_audit=True,
+        ),
     )
-    rolling, rolling_audit = build_rolling_features(
-        omni,
-        raw.index,
-        return_audit=True,
+    rolling, rolling_audit = _run(
+        "[features 2/5] Building rolling features",
+        lambda: build_rolling_features(
+            omni,
+            raw.index,
+            return_audit=True,
+        ),
     )
-    persistence, persistence_audit = build_persistence_features(
-        omni,
-        raw.index,
-        return_audit=True,
+
+    persistence, persistence_audit = _run(
+        "[features 3/5] Building persistence features",
+        lambda: build_persistence_features(
+            omni,
+            raw.index,
+            return_audit=True,
+        ),
     )
-    dynamics, dynamics_audit = build_dynamic_features(
-        omni,
-        raw.index,
-        return_audit=True,
+
+    dynamics, dynamics_audit = _run(
+        "[features 4/5] Building dynamics features",
+        lambda: build_dynamic_features(
+            omni,
+            raw.index,
+            return_audit=True,
+        ),
     )
-    interactions = build_interaction_features(raw)
+
+    interactions = _run(
+        "[features 5/5] Building interaction features",
+        lambda: build_interaction_features(raw),
+    )
 
     families = (
         raw,
