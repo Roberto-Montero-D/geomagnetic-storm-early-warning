@@ -30,6 +30,15 @@ from .factories import (
     make_phase5_model_by_id,
 )
 
+from .screening import (
+    ModelScreeningResult,
+    Phase5ScreeningResult,
+    advance_family_winners,
+    evaluate_model_configuration,
+    evaluate_phase5_screening,
+    rank_family_configurations,
+)
+
 __all__ = [
     "EXTRATREES_GRID","LIGHTGBM_GRID","XGBOOST_GRID","ModelConfiguration",
     "PHASE5_ADVANCE_PER_FAMILY","PHASE5_CONFIGURATIONS","PHASE5_CONFIG_IDS",
@@ -44,4 +53,10 @@ __all__ = [
     "dependency_versions",
     "make_phase5_model",
     "make_phase5_model_by_id",
+    "ModelScreeningResult",
+    "Phase5ScreeningResult",
+    "advance_family_winners",
+    "evaluate_model_configuration",
+    "evaluate_phase5_screening",
+    "rank_family_configurations",
 ]
