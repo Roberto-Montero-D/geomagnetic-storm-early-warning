@@ -39,6 +39,11 @@ from .screening import (
     rank_family_configurations,
 )
 
+from .isolation import (
+    assert_identical_phase5_screening_indices,
+    validate_phase5_screening_fold,
+)
+
 __all__ = [
     "EXTRATREES_GRID","LIGHTGBM_GRID","XGBOOST_GRID","ModelConfiguration",
     "PHASE5_ADVANCE_PER_FAMILY","PHASE5_CONFIGURATIONS","PHASE5_CONFIG_IDS",
@@ -59,4 +64,6 @@ __all__ = [
     "evaluate_model_configuration",
     "evaluate_phase5_screening",
     "rank_family_configurations",
+    "assert_identical_phase5_screening_indices",
+    "validate_phase5_screening_fold",
 ]

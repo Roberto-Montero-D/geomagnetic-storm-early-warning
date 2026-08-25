@@ -14,6 +14,7 @@ from .contract import (
     PHASE5_FEATURES, PHASE5_MAX_FAR_PER_DAY,
 )
 from .factories import configuration_by_id, make_phase5_model
+from .isolation import validate_phase5_screening_fold
 
 @dataclass(frozen=True)
 class ModelScreeningResult:
@@ -94,12 +95,45 @@ def advance_family_winners(configurations):
             advancing.extend(feasible.iloc[:PHASE5_ADVANCE_PER_FAMILY].tolist())
     return rankings,tuple(advancing)
 
-def evaluate_phase5_screening(dataset,fold,events,*,thresholds=DEFAULT_THRESHOLD_GRID,
-                              max_far_per_day=PHASE5_MAX_FAR_PER_DAY):
-    results={}
+def evaluate_phase5_screening(
+    dataset: pd.DataFrame,
+    fold: DevelopmentFold,
+    events: pd.DataFrame,
+    splits: pd.DataFrame,
+    *,
+    thresholds=DEFAULT_THRESHOLD_GRID,
+    max_far_per_day: float = PHASE5_MAX_FAR_PER_DAY,
+) -> Phase5ScreeningResult:
+    """Evaluate all 27 frozen Phase 5 configurations on screening only.
+
+    The temporal contract is validated before any model is fitted:
+    Initial Train -> Validation 1 only. Protected Final Test rows and
+    alternative development folds are rejected.
+    """
+    validate_phase5_screening_fold(
+        dataset,
+        fold,
+        splits,
+    )
+
+    results: dict[str, ModelScreeningResult] = {}
+
     for config in PHASE5_CONFIGURATIONS:
-        results[config.config_id]=evaluate_model_configuration(
-            dataset,fold,events,config.config_id,thresholds=thresholds,
-            max_far_per_day=max_far_per_day)
-    rankings,advancing=advance_family_winners(results)
-    return Phase5ScreeningResult(results,rankings,advancing)
+        results[config.config_id] = evaluate_model_configuration(
+            dataset,
+            fold,
+            events,
+            config.config_id,
+            thresholds=thresholds,
+            max_far_per_day=max_far_per_day,
+        )
+
+    family_rankings, advancing = advance_family_winners(
+        results
+    )
+
+    return Phase5ScreeningResult(
+        configurations=results,
+        family_rankings=family_rankings,
+        advancing_configurations=advancing,
+    )
