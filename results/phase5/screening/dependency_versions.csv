@@ -1,0 +1,4 @@
+package,version
+scikit-learn,1.9.0
+lightgbm,4.7.0
+xgboost,3.4.1

@@ -1,0 +1,4 @@
+rank,family,config_id
+1,extratrees,extratrees_n100_dnone
+2,lightgbm,lightgbm_lr0.1_leaves127
+3,xgboost,xgboost_lr0.1_d9
