@@ -1,0 +1,29 @@
+# Phase 8 direct-dependency freeze
+# Python runtime used for frozen development pipeline: CPython 3.14.7
+#
+# This file pins the repository's direct dependencies. Before Final Test
+# execution also capture `pip freeze --all` as a machine-specific audit artifact.
+
+numpy==2.5.2
+pandas==3.0.5
+scipy==1.18.0
+PyYAML==6.0.3
+requests==2.34.2
+beautifulsoup4==4.15.0
+
+# Machine learning
+scikit-learn==1.9.0
+imbalanced-learn==0.14.2
+lightgbm==4.7.0
+xgboost==3.4.1
+
+# Analysis and visualization
+matplotlib==3.11.1
+seaborn==0.13.2
+shap==0.52.0
+
+# Development and testing
+pytest==9.1.1
+
+# Optional interactive analysis
+jupyter==1.1.1

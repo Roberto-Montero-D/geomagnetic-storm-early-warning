@@ -25,9 +25,7 @@ data/
 *.pkl
 
 # Results (keep only final figures/tables)
-results/temp/
-results/*.pkl
-results/*.log
+results/
 
 # IDE
 .vscode/

@@ -337,3 +337,55 @@ phase_3:
   selected_experiment: "A"
   selected_feature_count: 10
   phase_3_complete: true
+
+phase_4:
+  contract_frozen: true
+  screening_complete: true
+  confirmation_complete: true
+  selected_experiment: "none"
+  use_resampling: false
+  class_weight: null
+  empirical_results_audited: true
+  phase_4_complete: true
+
+phase_5:
+  contract_frozen: true
+  screened_configuration_count: 27
+  family_winners:
+    ExtraTrees: "extratrees_n100_dnone"
+    LightGBM: "lightgbm_lr0.1_leaves127"
+    XGBoost: "xgboost_lr0.1_d9"
+  selected_config_id: "lightgbm_lr0.1_leaves127"
+  selected_family: "LightGBM"
+  random_state: 42
+  empirical_results_audited: true
+  phase_5_complete: true
+
+phase_6:
+  contract_frozen: true
+  selected_config_id: "lightgbm_lr0.1_leaves127"
+  oof_rows: 25873
+  selected_threshold: 0.10
+  event_recall: 0.6774193548387096
+  n_events: 31
+  n_detected_events: 21
+  far_per_day: 0.18552158621033587
+  fold_selected_thresholds:
+    walk_forward_1: 0.07
+    walk_forward_2: 0.16
+  stability_thresholds: [0.10, 0.11, 0.12, 0.13]
+  protected_final_test_scored: false
+  phase_6_complete: true
+
+phase_7_status:
+  contract_frozen: true
+  primary_control_id: "t5_h6"
+  selected_config_id: "lightgbm_lr0.1_leaves127"
+  primary_selected_threshold: 0.10
+  positive_control_oof_rows: 25873
+  positive_control_max_probability_abs_diff: 0.0
+  cross_task_ranking_authorized: false
+  primary_configuration_changed: false
+  protected_final_test_scored: false
+  empirical_results_audited: true
+  phase_7_complete: true

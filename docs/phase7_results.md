@@ -184,3 +184,11 @@ cross_task_ranking_authorized = false
 ```
 
 The protected 2022–2025 Final Test remains unopened.
+
+## Artifact Retention Note
+
+The repository intentionally retains the compact frozen cross-experiment
+summaries rather than every per-experiment OOF prediction file and 99-point
+threshold curve. Those larger files are reproducible intermediates generated
+by the committed Phase 7 runners; they are not required to reconstruct the
+frozen headline comparison.
