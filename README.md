@@ -1,6 +1,6 @@
 # Geomagnetic Storm Early Warning System
 
-**Status:** Protocol Frozen — Phases 0–6 Complete; Phase 7 Next  
+**Status:** Protocol Frozen — Phases 0–7 Complete; Phase 8 Final Test Locked  
 **Protocol:** `MASTER_PROTOCOL_v1.3.md`  
 **Primary Horizon:** 6 hours  
 **Primary Storm Threshold:** Kp >= 5  
@@ -41,7 +41,7 @@ Phase 0 froze a **93-feature causal universe**: raw, rolling, persistence, dynam
 
 Phase 3 later selected **Experiment A**, the **10-feature raw family**, for downstream primary modeling.
 
-> The canonical dataset contains 93 predictors, while the frozen Phase 4–6 model uses the 10-feature Phase 3 Experiment A subset.
+> The canonical dataset contains 93 predictors, while the frozen Phase 4–7 primary model uses the 10-feature Phase 3 Experiment A subset.
 
 The remaining causal features stay in the dataset/audit infrastructure but are not silently reintroduced into the selected model.
 
@@ -107,15 +107,8 @@ none
 No resampling and no class weighting.
 
 ### Phase 5 — COMPLETE / FROZEN
-Screened exactly 27 configurations. Family winners:
 
-```text
-ExtraTrees -> extratrees_n100_dnone
-LightGBM   -> lightgbm_lr0.1_leaves127
-XGBoost    -> xgboost_lr0.1_d9
-```
-
-Walk-forward confirmation selected:
+Selected model:
 
 ```text
 lightgbm_lr0.1_leaves127
@@ -129,6 +122,7 @@ lightgbm_lr0.1_leaves127
 Aggregate ranking values: worst-fold Event Recall `0.7333`, mean Event Recall `0.7417`, mean PR-AUC `0.2792`, mean FAR/day `0.1917`.
 
 ### Phase 6 — COMPLETE / FROZEN
+
 Generated 25,873 development-only OOF predictions from the frozen LightGBM model and swept `tau=0.01..0.99`.
 
 Frozen rule: select the **lowest** threshold satisfying `FAR/day <= 0.2`.
@@ -148,29 +142,50 @@ Alert episodes   = 222
 False alarms     = 200
 ```
 
-Stability thresholds for predefined `0.15 <= FAR/day <= 0.20`:
+### Phase 7 — COMPLETE / FROZEN
+
+Phase 7 changed only pre-authorized retrospective truth definitions while keeping the Phase 3–6 predictor/model framework frozen.
+
+The `t5_h6` positive control reproduced Phase 6 exactly:
 
 ```text
-0.10, 0.11, 0.12, 0.13
+OOF rows = 25,873
+maximum probability absolute difference = 0
 ```
 
-Fold diagnostic thresholds:
+Controlled horizon comparison (`T=5`):
 
-```text
-WF1 = 0.07
-WF2 = 0.16
-```
+| Experiment | H | Selected tau | Event Recall | Detected / Events | FAR/day |
+|---|---:|---:|---:|---:|---:|
+| `t5_h3` | 3 h | 0.05 | 0.6774 | 21 / 31 | 0.1939 |
+| `t5_h6` | 6 h | 0.10 | 0.6774 | 21 / 31 | 0.1855 |
+| `t5_h12` | 12 h | 0.13 | 0.8387 | 26 / 31 | 0.1929 |
+| `t5_h24` | 24 h | 0.20 | 0.9032 | 28 / 31 | 0.1939 |
 
-At `tau=0.13`, observed OOF recall is `22/31 = 0.7097` with FAR/day `0.1568`. This is a diagnostic only; it does not reopen the frozen minimum-feasible-threshold rule.
+Controlled severity comparison (`H=6 h`):
+
+| Experiment | T | Event Recall | Detected / Events |
+|---|---:|---:|---:|
+| `t5_h6` | 5 | 0.6774 | 21 / 31 |
+| `t6_h6` | 6 | 1.0000 | 4 / 4 |
+| `t7_h6` | 7 | 0.5000 | 1 / 2 |
+
+The severity results are strongly sample-size limited. They are descriptive diagnostics, not evidence for replacing the primary task.
+
+Longer T=5 horizons increase both Event Recall and target prevalence, so the horizon variants are different operational questions rather than interchangeable model candidates.
+
+The frozen primary configuration remains `T=5`, `H=6 h`, `tau=0.10`.
 
 ## 7. Final Test Protection
 
-The 2022–2025 Final Test may not influence feature, imbalance, model, hyperparameter, threshold, or candidate-selection decisions before its protocol-authorized evaluation.
+The 2022–2025 Final Test may not influence feature, imbalance, model, hyperparameter, threshold, horizon, severity, or candidate-selection decisions before its protocol-authorized evaluation.
 
-The official Phase 6 summary records:
+The official Phase 7 analysis records:
 
 ```text
+primary_control_id = t5_h6
 protected_final_test_scored = false
+cross_task_ranking_authorized = false
 ```
 
 ## 8. Current Status
@@ -184,13 +199,13 @@ protected_final_test_scored = false
 | 4 — Imbalance experiments | COMPLETE / FROZEN |
 | 5 — Model selection | COMPLETE / FROZEN |
 | 6 — OOF threshold selection | COMPLETE / FROZEN |
-| 7 — Horizon/severity experiments | NEXT |
-| 8 — Protected Final Test | LOCKED |
+| 7 — Horizon/severity experiments | COMPLETE / FROZEN |
+| 8 — Protected Final Test | LOCKED / NEXT |
 | 9 — Interpretation/scientific audit | PENDING |
 
 ## 9. Documentation and Results
 
-Current decision records include the Phase 0–4 documents plus:
+Current decision records include:
 
 ```text
 docs/phase5_model_selection_contract.md
@@ -199,17 +214,20 @@ docs/phase5_closure.md
 docs/phase6_threshold_selection_contract.md
 docs/phase6_threshold_selection_results.md
 docs/phase6_closure.md
+docs/phase7_horizon_severity_contract.md
+docs/phase7_results.md
+docs/phase7_closure.md
 docs/project_status.md
 ```
 
-Historical protocol versions and historical decision documents remain unchanged.
-
-Machine-readable results include:
+Machine-readable result summaries include:
 
 ```text
 results/phase5/screening/
 results/phase5/confirmation/
 results/phase6/threshold_selection/
+results/phase7/experiments/
+results/phase7/analysis/
 ```
 
 ## 10. Reproducibility
@@ -223,11 +241,36 @@ python -m pytest -q
 Phase 6 runner:
 
 ```bash
-python -m scripts.run_phase6_threshold_selection   --omni-fmt <path-to-omni.fmt>   --omni-lst <path-to-omni.lst>   --output-dir results/phase6/threshold_selection
+python -m scripts.run_phase6_threshold_selection --omni-fmt <path-to-omni.fmt> --omni-lst <path-to-omni.lst> --output-dir results/phase6/threshold_selection
 ```
 
-This runner is development-only.
+Phase 7 experiment runner:
+
+```bash
+python -m scripts.run_phase7_experiments --omni-fmt <path-to-omni.fmt> --omni-lst <path-to-omni.lst> --output-dir results/phase7/experiments
+```
+
+Phase 7 analysis runner:
+
+```bash
+python -m scripts.run_phase7_analysis --phase6-dir results/phase6/threshold_selection --phase7-experiments-dir results/phase7/experiments --output-dir results/phase7/analysis
+```
+
+All Phase 0–7 runners are development-only with respect to selection and comparison logic.
 
 ## 11. Next Step
 
-Proceed to **Phase 7 — horizon/severity experiments** under its frozen protocol contract. Phases 3–6 must not be reopened, and the protected Final Test remains locked.
+Proceed to **Phase 8 — protected Final Test evaluation** only through a dedicated frozen execution path.
+
+Before Final Test outcomes are accessed, the Phase 8 runner and its tests must enforce the unchanged primary configuration:
+
+```text
+T = 5
+H = 6 h
+feature set = Phase 3 Experiment A
+imbalance = none
+model = lightgbm_lr0.1_leaves127
+tau = 0.10
+```
+
+No Phase 7 alternative horizon or severity result may replace that primary configuration.
