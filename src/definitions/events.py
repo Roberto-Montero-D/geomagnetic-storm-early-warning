@@ -203,21 +203,27 @@ def _expand_to_hourly(
 ) -> list[_HourlyState]:
     """Expand canonical 3-hour Kp intervals to hourly ground truth.
 
-    Gaps between canonical intervals are explicitly represented as missing
-    hourly states. This is essential because a missing interval must not be
-    interpreted as quiet time.
+    The implementation is vectorized. Temporal gaps between canonical
+    intervals remain explicit NaN hourly states, preserving the frozen event
+    semantics that missing data cannot count as quiet time.
     """
 
     if kp_intervals.empty:
         return []
 
-    first_start = kp_intervals[
-        "interval_start"
-    ].iloc[0]
+    starts = pd.DatetimeIndex(
+        kp_intervals["interval_start"]
+    )
+    ends = pd.DatetimeIndex(
+        kp_intervals["interval_end"]
+    )
+    kp_values = kp_intervals["kp"].to_numpy(
+        dtype=float,
+        copy=False,
+    )
 
-    final_end = kp_intervals[
-        "interval_end"
-    ].iloc[-1]
+    first_start = starts[0]
+    final_end = ends[-1]
 
     hourly_index = pd.date_range(
         start=first_start,
@@ -226,35 +232,55 @@ def _expand_to_hourly(
         inclusive="left",
     )
 
-    hourly = pd.Series(
+    hourly_values = np.full(
+        len(hourly_index),
         np.nan,
-        index=hourly_index,
         dtype=float,
     )
 
-    for row in kp_intervals.itertuples(
-        index=False
-    ):
-        interval_hours = pd.date_range(
-            start=row.interval_start,
-            end=row.interval_end,
-            freq="h",
-            inclusive="left",
-        )
+    # Each validated canonical interval spans exactly three hours. Convert
+    # interval starts directly into integer offsets from the first hour and
+    # assign all three positions without constructing one DatetimeIndex per
+    # interval or performing repeated .loc alignment.
+    # Compute offsets as timedeltas rather than mixing ``DatetimeIndex.asi8``
+    # with ``Timestamp.value``. Pandas may store the index in microseconds
+    # while Timestamp.value is nanoseconds.
+    start_offsets = np.asarray(
+        (starts - first_start) / pd.Timedelta(hours=1),
+        dtype=np.int64,
+    )
 
-        hourly.loc[
-            interval_hours
-        ] = row.kp
+    positions = (
+        start_offsets[:, None]
+        + np.arange(
+            3,
+            dtype=np.int64,
+        )[None, :]
+    ).reshape(-1)
 
+    repeated_kp = np.repeat(
+        kp_values,
+        3,
+    )
+
+    hourly_values[positions] = repeated_kp
+
+    # Keep the same external representation as the original implementation so
+    # identify_events and its tests retain identical behavior.
     return [
         _HourlyState(
-            timestamp=timestamp,
-            kp=float(value)
-            if pd.notna(value)
-            else np.nan,
+            timestamp=pd.Timestamp(timestamp),
+            kp=(
+                float(value)
+                if not np.isnan(value)
+                else np.nan
+            ),
         )
-        for timestamp, value
-        in hourly.items()
+        for timestamp, value in zip(
+            hourly_index,
+            hourly_values,
+            strict=True,
+        )
     ]
 
 
@@ -315,59 +341,7 @@ def identify_events(
         DEFAULT_TERMINATION_HOURS
     ),
 ) -> pd.DataFrame:
-    """Identify canonical geomagnetic-storm events.
-
-    Parameters
-    ----------
-    kp_intervals
-        Canonical Kp interval table containing:
-
-            interval_start
-            interval_end
-            kp
-
-        Intervals must be ordered, non-overlapping, and exactly three
-        hours long. Missing canonical intervals may appear as temporal
-        gaps. Explicit missing Kp values are also permitted.
-
-    threshold
-        Storm threshold. Primary protocol value: 5.
-
-    termination_hours
-        Number of consecutive valid hourly states below threshold required
-        to terminate an active event. Primary protocol value: 6.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Columns:
-
-            event_id
-            start_time
-            end_time
-            threshold
-            peak_kp
-            boundary_status
-
-        ``end_time`` is the final active hourly timestamp before the
-        terminating quiet run.
-
-        For a right-censored event, ``end_time`` is NaT because true
-        termination was not observed.
-
-    Notes
-    -----
-    Missing Kp states:
-
-    - do not start an event;
-    - do not terminate an event;
-    - do not count toward the quiet run;
-    - reset an in-progress quiet run.
-
-    The first observed storm state is marked left-censored only when the
-    dataset begins in storm conditions. This prevents the first available
-    timestamp from being asserted as the physical storm onset.
-    """
+    """Identify canonical geomagnetic-storm events."""
 
     _validate_parameters(
         threshold,
@@ -422,7 +396,6 @@ def identify_events(
 
             continue
 
-        # Active event.
         if np.isnan(kp):
             quiet_run = 0
             quiet_run_start = None
@@ -438,7 +411,6 @@ def identify_events(
             quiet_run_start = None
             continue
 
-        # Valid below-threshold state.
         if quiet_run == 0:
             quiet_run_start = timestamp
 
@@ -450,7 +422,6 @@ def identify_events(
         assert event_start is not None
         assert quiet_run_start is not None
 
-        # The quiet run itself is not part of the storm.
         end_time = (
             quiet_run_start
             - pd.Timedelta(

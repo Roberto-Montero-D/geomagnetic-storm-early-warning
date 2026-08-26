@@ -159,6 +159,7 @@ def _validate_intervals(
         starts = frame["interval_start"].iloc[
             1:
         ].reset_index(drop=True)
+
         previous_ends = frame["interval_end"].iloc[
             :-1
         ].reset_index(drop=True)
@@ -177,6 +178,7 @@ def _validate_intervals(
         frame["kp"].notna()
         & ~np.isfinite(frame["kp"])
     )
+
     if invalid.any():
         raise ValueError(
             "kp must contain only finite values or NaN."
@@ -190,9 +192,8 @@ def _expand_retrospective_kp_hourly(
 ) -> pd.Series:
     """Expand canonical 3-hour Kp intervals onto hourly ground truth.
 
-    Temporal gaps between intervals remain NaN.
+    Temporal gaps between canonical Kp intervals remain NaN.
     """
-
     if intervals.empty:
         return pd.Series(
             dtype=float,
@@ -203,34 +204,48 @@ def _expand_retrospective_kp_hourly(
             name="kp",
         )
 
-    first_start = intervals["interval_start"].iloc[0]
-    final_end = intervals["interval_end"].iloc[-1]
+    starts = pd.DatetimeIndex(
+        intervals["interval_start"]
+    )
+    kp_values = intervals["kp"].to_numpy(
+        dtype=float
+    )
 
-    index = pd.date_range(
-        first_start,
-        final_end,
+    expanded_index = np.concatenate(
+        [
+            (
+                starts
+                + pd.Timedelta(hours=offset)
+            ).to_numpy()
+            for offset in range(3)
+        ]
+    )
+
+    # The timestamp array is grouped by offset, so values must be tiled.
+    expanded_values = np.tile(
+        kp_values,
+        3,
+    )
+
+    sparse = pd.Series(
+        expanded_values,
+        index=pd.DatetimeIndex(
+            expanded_index,
+            name="timestamp",
+        ),
+        dtype=float,
+        name="kp",
+    ).sort_index()
+
+    full_index = pd.date_range(
+        intervals["interval_start"].iloc[0],
+        intervals["interval_end"].iloc[-1],
         freq="h",
         inclusive="left",
         name="timestamp",
     )
 
-    hourly = pd.Series(
-        np.nan,
-        index=index,
-        dtype=float,
-        name="kp",
-    )
-
-    for row in intervals.itertuples(index=False):
-        interval_hours = pd.date_range(
-            row.interval_start,
-            row.interval_end,
-            freq="h",
-            inclusive="left",
-        )
-        hourly.loc[interval_hours] = row.kp
-
-    return hourly
+    return sparse.reindex(full_index)
 
 
 def build_event_window_target(
@@ -261,7 +276,6 @@ def build_event_window_target(
     missing, because the existential target condition has already been
     satisfied.
     """
-
     threshold, horizon_hours = _validate_parameters(
         threshold,
         horizon_hours,
@@ -281,6 +295,7 @@ def build_event_window_target(
 
     audit = pd.DataFrame(index=prediction_index)
     audit.index.name = "prediction_time"
+
     audit["future_window_start"] = (
         prediction_index + pd.Timedelta(hours=1)
     )
@@ -289,64 +304,65 @@ def build_event_window_target(
         + pd.Timedelta(hours=horizon_hours)
     )
     audit["expected_future_hours"] = horizon_hours
-    audit["observed_future_hours"] = 0
-    audit["missing_future_hours"] = horizon_hours
-    audit["positive_future_hours"] = 0
-    audit["target_status"] = "unknown"
 
-    for row_i, t in enumerate(prediction_index):
-        future_times = pd.date_range(
-            t + pd.Timedelta(hours=1),
-            periods=horizon_hours,
-            freq="h",
-        )
+    future_values = np.column_stack(
+        [
+            hourly.reindex(
+                prediction_index + pd.Timedelta(hours=offset)
+            ).to_numpy(dtype=float)
+            for offset in range(
+                1,
+                horizon_hours + 1,
+            )
+        ]
+    )
 
-        future_values = hourly.reindex(future_times)
+    observed_mask = ~np.isnan(future_values)
+    positive_mask = (
+        observed_mask
+        & (future_values >= threshold)
+    )
 
-        observed_mask = future_values.notna()
-        positive_mask = (
-            observed_mask
-            & (future_values >= threshold)
-        )
+    observed_count = (
+        observed_mask.sum(axis=1).astype(int)
+    )
+    positive_count = (
+        positive_mask.sum(axis=1).astype(int)
+    )
+    missing_count = (
+        horizon_hours - observed_count
+    )
 
-        observed_count = int(observed_mask.sum())
-        positive_count = int(positive_mask.sum())
-        missing_count = horizon_hours - observed_count
+    target_values = np.full(
+        len(prediction_index),
+        np.nan,
+        dtype=float,
+    )
 
-        audit.iat[
-            row_i,
-            audit.columns.get_loc("observed_future_hours"),
-        ] = observed_count
-        audit.iat[
-            row_i,
-            audit.columns.get_loc("missing_future_hours"),
-        ] = missing_count
-        audit.iat[
-            row_i,
-            audit.columns.get_loc("positive_future_hours"),
-        ] = positive_count
+    has_positive = positive_count > 0
+    known_negative = (
+        (positive_count == 0)
+        & (missing_count == 0)
+    )
 
-        if positive_count > 0:
-            target.iat[row_i] = 1.0
-            audit.iat[
-                row_i,
-                audit.columns.get_loc("target_status"),
-            ] = "positive"
+    target_values[has_positive] = 1.0
+    target_values[known_negative] = 0.0
 
-        elif missing_count == 0:
-            target.iat[row_i] = 0.0
-            audit.iat[
-                row_i,
-                audit.columns.get_loc("target_status"),
-            ] = "negative"
+    target.iloc[:] = target_values
 
-        else:
-            # Keep NaN: the existential condition was not observed,
-            # but the complete future horizon is not known.
-            audit.iat[
-                row_i,
-                audit.columns.get_loc("target_status"),
-            ] = "unknown"
+    audit["observed_future_hours"] = observed_count
+    audit["missing_future_hours"] = missing_count
+    audit["positive_future_hours"] = positive_count
+
+    status = np.full(
+        len(prediction_index),
+        "unknown",
+        dtype=object,
+    )
+    status[has_positive] = "positive"
+    status[known_negative] = "negative"
+
+    audit["target_status"] = status
 
     if return_audit:
         return target, audit

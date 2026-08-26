@@ -8,13 +8,12 @@ For prediction time t:
 For a W-hour rolling window, eligible OMNI hourly intervals satisfy:
     cutoff - W < period_end <= cutoff
 
-Because OMNI timestamps are interval starts and each interval lasts one hour,
-this is equivalent to source starts:
-    cutoff - W - 1h < period_start <= cutoff - 1h
-
 Only observations already causally available at t enter the window.
 Missing timestamps are not replaced and do not cause the window to extend
 farther into the past.
+
+This implementation preserves the frozen semantics while using pandas'
+vectorized time-based rolling engine.
 """
 
 from __future__ import annotations
@@ -41,6 +40,7 @@ def _validate_prediction_times(
     prediction_times: Iterable[pd.Timestamp] | pd.DatetimeIndex,
 ) -> pd.DatetimeIndex:
     index = pd.DatetimeIndex(prediction_times, name="prediction_time")
+
     if index.hasnans:
         raise ValueError("prediction_times must not contain NaT.")
     if index.has_duplicates:
@@ -54,6 +54,7 @@ def _validate_prediction_times(
         or (index.nanosecond != 0).any()
     ):
         raise ValueError("prediction_times must be aligned to whole hours.")
+
     return index
 
 
@@ -72,11 +73,13 @@ def _prepare_omni(omni: pd.DataFrame) -> pd.DataFrame:
         raise KeyError(f"Missing primary OMNI column(s): {sorted(missing)}")
 
     work = omni.loc[:, PRIMARY_OMNI_COLUMNS].copy()
+
     for column in PRIMARY_OMNI_COLUMNS:
         work[column] = pd.to_numeric(work[column], errors="raise")
         work[column] = work[column].mask(
             work[column] == PRIMARY_OMNI_FILL_VALUES[column]
         )
+
     return work.astype(float)
 
 
@@ -114,82 +117,132 @@ def build_rolling_features(
     if not windows_hours:
         raise ValueError("windows_hours must not be empty.")
     if any(
-        (not isinstance(w, int)) or isinstance(w, bool) or w <= 0
-        for w in windows_hours
+        (not isinstance(window, int))
+        or isinstance(window, bool)
+        or window <= 0
+        for window in windows_hours
     ):
         raise ValueError("windows_hours must contain positive integers.")
     if len(set(windows_hours)) != len(windows_hours):
         raise ValueError("windows_hours must be unique.")
 
-    ends = interval_end_times(work.index)
-    values = work.to_numpy(dtype=float)
+    ends = pd.DatetimeIndex(interval_end_times(work.index))
+
+    source = work.copy()
+    source.index = ends
+    source.index.name = "information_time"
+
+    cutoffs = pd.DatetimeIndex(
+        [information_cutoff(t) for t in prediction_index]
+    )
+
+    # Add requested cutoffs to the source timeline. An inserted cutoff row is
+    # NaN and contributes no observation; it only lets pandas evaluate the
+    # physical-time rolling window at the exact requested instant.
+    timeline = source.index.union(cutoffs).sort_values()
+    aligned = source.reindex(timeline)
+
+    pieces: dict[str, np.ndarray] = {}
+
+    for window in windows_hours:
+        roller = aligned.rolling(
+            f"{window}h",
+            closed="right",
+            min_periods=1,
+        )
+
+        statistic_frames = {
+            "mean": roller.mean(),
+            "min": roller.min(),
+            "std": roller.std(ddof=1),
+        }
+
+        for column in PRIMARY_OMNI_COLUMNS:
+            for stat in ROLLING_STATISTICS:
+                feature_name = f"{column}_roll_{stat}_{window}h"
+
+                pieces[feature_name] = (
+                    statistic_frames[stat][column]
+                    .reindex(cutoffs)
+                    .to_numpy(dtype=float)
+                )
 
     output = pd.DataFrame(
-        np.nan,
+        pieces,
         index=prediction_index,
-        columns=rolling_feature_names(windows_hours),
         dtype=float,
     )
+
+    output = output.loc[:, rolling_feature_names(windows_hours)]
     output.index.name = "prediction_time"
 
     audit = pd.DataFrame(index=prediction_index)
     audit.index.name = "prediction_time"
-    audit["information_cutoff"] = pd.DatetimeIndex(
-        [information_cutoff(t) for t in prediction_index]
+
+    # Preserve the same datetime-resolution contract used by the rest of the
+    # feature pipeline. Do not force datetime64[ns].
+    audit["information_cutoff"] = pd.Series(
+        [information_cutoff(t) for t in prediction_index],
+        index=prediction_index,
+        name="information_cutoff",
     )
+
     audit["maximum_rolling_information_time"] = pd.NaT
 
-    for row_i, t in enumerate(prediction_index):
-        cutoff = information_cutoff(t)
-        row_max_info = pd.NaT
+    # Windows are nested. Therefore the maximum provenance across all rolling
+    # features is the latest valid source interval end lying inside the largest
+    # requested window.
+    valid_ends = source.index[
+        source.notna().any(axis=1).to_numpy()
+    ]
 
-        for window in windows_hours:
-            lower = cutoff - pd.Timedelta(hours=window)
+    if len(valid_ends) and len(cutoffs):
+        positions = (
+            valid_ends.searchsorted(
+                cutoffs,
+                side="right",
+            )
+            - 1
+        )
 
-            # Physical-time interval: (cutoff-W, cutoff].
-            mask = (ends > lower) & (ends <= cutoff)
-            if not mask.any():
-                continue
+        has_candidate = positions >= 0
 
-            window_values = values[mask]
-            window_ends = ends[mask]
+        # Preserve the datetime unit already used by the source index rather
+        # than coercing provenance to nanoseconds.
+        source_datetime_dtype = valid_ends.to_numpy().dtype
 
-            for col_i, column in enumerate(PRIMARY_OMNI_COLUMNS):
-                series = window_values[:, col_i]
-                valid = ~np.isnan(series)
-                if not valid.any():
-                    continue
+        latest = np.full(
+            len(cutoffs),
+            np.array("NaT", dtype=source_datetime_dtype),
+            dtype=source_datetime_dtype,
+        )
 
-                valid_values = series[valid]
-                output.iat[
-                    row_i,
-                    output.columns.get_loc(
-                        f"{column}_roll_mean_{window}h"
-                    ),
-                ] = float(np.mean(valid_values))
-                output.iat[
-                    row_i,
-                    output.columns.get_loc(
-                        f"{column}_roll_min_{window}h"
-                    ),
-                ] = float(np.min(valid_values))
+        if has_candidate.any():
+            latest[has_candidate] = (
+                valid_ends.to_numpy()[
+                    positions[has_candidate]
+                ]
+            )
 
-                if valid_values.size >= 2:
-                    output.iat[
-                        row_i,
-                        output.columns.get_loc(
-                            f"{column}_roll_std_{window}h"
-                        ),
-                    ] = float(np.std(valid_values, ddof=1))
+        lower_bound = (
+            cutoffs
+            - pd.Timedelta(hours=max(windows_hours))
+        ).to_numpy(dtype=source_datetime_dtype)
 
-                latest_valid_end = window_ends[valid][-1]
-                if pd.isna(row_max_info) or latest_valid_end > row_max_info:
-                    row_max_info = latest_valid_end
+        in_largest_window = (
+            has_candidate
+            & (latest > lower_bound)
+        )
 
-        audit.iat[
-            row_i,
-            audit.columns.get_loc("maximum_rolling_information_time"),
-        ] = row_max_info
+        latest[~in_largest_window] = np.array(
+            "NaT",
+            dtype=source_datetime_dtype,
+        )
+
+        audit["maximum_rolling_information_time"] = pd.Series(
+            latest,
+            index=prediction_index,
+        )
 
     violation = (
         audit["maximum_rolling_information_time"].notna()
@@ -198,6 +251,7 @@ def build_rolling_features(
             > audit["information_cutoff"]
         )
     )
+
     if violation.any():
         raise AssertionError(
             "Rolling feature provenance exceeds the information cutoff."
@@ -205,4 +259,5 @@ def build_rolling_features(
 
     if return_audit:
         return output, audit
+
     return output

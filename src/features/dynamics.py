@@ -14,12 +14,12 @@ the four exact hourly samples spanning the same 3 elapsed hours:
 
 where ``t0`` is the latest causally eligible OMNI interval start.
 
-This makes the slope a trend estimate distinct from the endpoint-only 3-hour
-delta.
-
 All required timestamps must exist and all required values must be valid.
 Missing timestamps, missing values, or source fill values produce NaN for the
 affected dynamic feature. The builder never substitutes a nearby row.
+
+This implementation preserves those semantics using vectorized exact reindexing
+and the same centered OLS arithmetic as the original reference implementation.
 """
 
 from __future__ import annotations
@@ -89,6 +89,7 @@ def _prepare_source(omni: pd.DataFrame) -> pd.DataFrame:
         raise KeyError(f"Missing primary OMNI column(s): {sorted(missing)}")
 
     work = omni.loc[:, PRIMARY_OMNI_COLUMNS].copy()
+
     for column in PRIMARY_OMNI_COLUMNS:
         work[column] = pd.to_numeric(work[column], errors="raise")
         work[column] = work[column].mask(
@@ -98,30 +99,56 @@ def _prepare_source(omni: pd.DataFrame) -> pd.DataFrame:
     return work.astype(float)
 
 
-def _exact_values(
-    series: pd.Series,
-    timestamps: pd.DatetimeIndex,
-) -> np.ndarray | None:
-    if not timestamps.isin(series.index).all():
-        return None
+def _ols_slope_four_points(
+    oldest: np.ndarray,
+    older_2: np.ndarray,
+    older_1: np.ndarray,
+    latest: np.ndarray,
+) -> np.ndarray:
+    """Return the frozen four-point OLS slope in units per hour.
 
-    values = series.reindex(timestamps).to_numpy(dtype=float)
-    if np.isnan(values).any():
-        return None
+    This intentionally mirrors the original implementation's arithmetic:
+    center x and y, then compute dot(x_centered, y_centered) / denominator.
 
-    return values
+    Using a pre-collapsed weight vector is mathematically equivalent but can
+    differ by a few floating-point ULPs, which would violate the existing
+    regression contract for exact simple-linear cases.
+    """
+    matrix = np.column_stack(
+        [oldest, older_2, older_1, latest]
+    ).astype(float, copy=False)
 
+    missing = np.isnan(matrix).any(axis=1)
 
-def _ols_slope_per_hour(values_oldest_to_latest: np.ndarray) -> float:
-    x = np.arange(values_oldest_to_latest.size, dtype=float)
+    x = np.arange(4, dtype=float)
     x_centered = x - x.mean()
-    y_centered = values_oldest_to_latest - values_oldest_to_latest.mean()
-
     denominator = float(np.dot(x_centered, x_centered))
-    if denominator == 0.0:
-        return np.nan
 
-    return float(np.dot(x_centered, y_centered) / denominator)
+    slopes = np.full(
+        matrix.shape[0],
+        np.nan,
+        dtype=float,
+    )
+
+    valid = ~missing
+    if valid.any():
+        valid_matrix = matrix[valid]
+
+        # Reproduce the reference implementation row-wise, but vectorized:
+        # y_centered = y - mean(y)
+        y_centered = (
+            valid_matrix
+            - valid_matrix.mean(axis=1, keepdims=True)
+        )
+
+        numerators = y_centered @ x_centered
+
+        slopes[valid] = (
+            numerators
+            / denominator
+        )
+
+    return slopes
 
 
 def build_dynamic_features(
@@ -131,71 +158,118 @@ def build_dynamic_features(
     return_audit: bool = False,
 ) -> pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame]:
     """Build causal 1h/3h deltas and 3h OLS slopes."""
-
     prediction_index = _validate_prediction_times(prediction_times)
     source = _prepare_source(omni)
 
+    latest_starts = (
+        prediction_index
+        - pd.Timedelta(hours=2)
+    )
+
+    # Exact source timestamp lookups. Missing timestamps remain NaN.
+    lag_frames: dict[int, pd.DataFrame] = {}
+
+    for lag in range(4):
+        requested_starts = (
+            latest_starts
+            - pd.Timedelta(hours=lag)
+        )
+
+        frame = source.reindex(
+            requested_starts
+        )
+
+        frame.index = prediction_index
+        lag_frames[lag] = frame
+
+    latest = lag_frames[0]
+
+    output_data: dict[str, np.ndarray] = {}
+
+    for column in PRIMARY_OMNI_COLUMNS:
+        output_data[
+            f"{column}_delta_1h"
+        ] = (
+            latest[column]
+            - lag_frames[1][column]
+        ).to_numpy(dtype=float)
+
+        output_data[
+            f"{column}_delta_3h"
+        ] = (
+            latest[column]
+            - lag_frames[3][column]
+        ).to_numpy(dtype=float)
+
+        output_data[
+            f"{column}_slope_3h"
+        ] = _ols_slope_four_points(
+            lag_frames[3][column].to_numpy(dtype=float),
+            lag_frames[2][column].to_numpy(dtype=float),
+            lag_frames[1][column].to_numpy(dtype=float),
+            lag_frames[0][column].to_numpy(dtype=float),
+        )
+
     features = pd.DataFrame(
-        np.nan,
+        output_data,
         index=prediction_index,
-        columns=DYNAMIC_FEATURE_COLUMNS,
         dtype=float,
     )
+
+    features = features.loc[
+        :,
+        DYNAMIC_FEATURE_COLUMNS,
+    ]
     features.index.name = "prediction_time"
 
-    audit = pd.DataFrame(index=prediction_index)
-    audit.index.name = "prediction_time"
-    audit["information_cutoff"] = pd.DatetimeIndex(
-        [information_cutoff(t) for t in prediction_index]
+    audit = pd.DataFrame(
+        index=prediction_index
     )
+    audit.index.name = "prediction_time"
+
+    audit["information_cutoff"] = pd.Series(
+        [
+            information_cutoff(t)
+            for t in prediction_index
+        ],
+        index=prediction_index,
+        name="information_cutoff",
+    )
+
     audit["dynamics_information_time"] = pd.NaT
 
-    for row_i, t in enumerate(prediction_index):
-        cutoff = information_cutoff(t)
-        latest_start = cutoff - DEFAULT_INTERVAL_DURATION
+    source_present = latest_starts.isin(
+        source.index
+    )
 
-        if latest_start in source.index:
-            audit.iat[
-                row_i,
-                audit.columns.get_loc("dynamics_information_time"),
-            ] = latest_start + DEFAULT_INTERVAL_DURATION
+    if source_present.any():
+        provenance = pd.Series(
+            pd.NaT,
+            index=prediction_index,
+            dtype="datetime64[ns]",
+        )
 
-        for column in PRIMARY_OMNI_COLUMNS:
-            latest = source[column].get(latest_start, np.nan)
+        provenance.loc[source_present] = (
+            latest_starts[source_present]
+            + DEFAULT_INTERVAL_DURATION
+        ).to_numpy()
 
-            for lag in DYNAMIC_DELTAS_HOURS:
-                older_start = latest_start - pd.Timedelta(hours=lag)
-                older = source[column].get(older_start, np.nan)
-
-                name = f"{column}_delta_{lag}h"
-
-                if pd.notna(latest) and pd.notna(older):
-                    features.iat[
-                        row_i,
-                        features.columns.get_loc(name),
-                    ] = float(latest - older)
-
-            slope_times = pd.date_range(
-                latest_start - pd.Timedelta(hours=DYNAMIC_SLOPE_HOURS),
-                latest_start,
-                freq="h",
-            )
-            slope_values = _exact_values(source[column], slope_times)
-
-            if slope_values is not None:
-                name = f"{column}_slope_3h"
-                features.iat[
-                    row_i,
-                    features.columns.get_loc(name),
-                ] = _ols_slope_per_hour(slope_values)
+        audit[
+            "dynamics_information_time"
+        ] = provenance
 
     violation = (
-        audit["dynamics_information_time"].notna()
+        audit[
+            "dynamics_information_time"
+        ].notna()
         & (
-            audit["dynamics_information_time"]
+            audit[
+                "dynamics_information_time"
+            ]
             > audit["information_cutoff"]
         )
     )
+
     if violation.any():
         raise AssertionError(
             "Dynamic-feature provenance exceeds the information cutoff."
@@ -203,4 +277,5 @@ def build_dynamic_features(
 
     if return_audit:
         return features, audit
+
     return features
