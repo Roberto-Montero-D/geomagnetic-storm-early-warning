@@ -1,0 +1,4 @@
+config_id,feasible_both_folds,worst_fold_event_recall,mean_event_recall,mean_pr_auc,mean_false_alarm_rate_per_day
+lightgbm_lr0.1_leaves127,True,0.7333333333333333,0.7416666666666667,0.27918883010337137,0.19172891237911494
+xgboost_lr0.1_d9,True,0.6,0.64375,0.29470109572999514,0.18892960468224684
+extratrees_n100_dnone,True,0.6,0.64375,0.27134673108116836,0.19595153878076293
