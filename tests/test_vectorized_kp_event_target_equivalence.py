@@ -42,7 +42,6 @@ def _reference_build_kp_intervals(df, kp_column="kp_raw"):
                 raise ValueError("inconsistent interval")
             kp_value = float(unique[0]) / 10.0
 
-        # The reference receives raw Kp*10 values. All-missing remains NaN.
         records.append(
             {
                 "interval_start": interval_start,
@@ -133,26 +132,16 @@ def _reference_event_window_target(
         positive_count = int(positive.sum())
         missing_count = horizon_hours - observed_count
 
-        audit.iloc[row_i, audit.columns.get_loc("observed_future_hours")] = (
-            observed_count
-        )
-        audit.iloc[row_i, audit.columns.get_loc("missing_future_hours")] = (
-            missing_count
-        )
-        audit.iloc[row_i, audit.columns.get_loc("positive_future_hours")] = (
-            positive_count
-        )
+        audit.iloc[row_i, audit.columns.get_loc("observed_future_hours")] = observed_count
+        audit.iloc[row_i, audit.columns.get_loc("missing_future_hours")] = missing_count
+        audit.iloc[row_i, audit.columns.get_loc("positive_future_hours")] = positive_count
 
         if positive_count > 0:
             target.iloc[row_i] = 1.0
-            audit.iloc[row_i, audit.columns.get_loc("target_status")] = (
-                "positive"
-            )
+            audit.iloc[row_i, audit.columns.get_loc("target_status")] = "positive"
         elif missing_count == 0:
             target.iloc[row_i] = 0.0
-            audit.iloc[row_i, audit.columns.get_loc("target_status")] = (
-                "negative"
-            )
+            audit.iloc[row_i, audit.columns.get_loc("target_status")] = "negative"
 
     return target, audit
 
@@ -171,7 +160,6 @@ def _canonical_gap_fixture():
         [
             "2020-01-01 00:00",
             "2020-01-01 03:00",
-            # Deliberate missing 06:00-09:00 interval.
             "2020-01-01 09:00",
             "2020-01-01 12:00",
             "2020-01-01 15:00",
@@ -189,10 +177,8 @@ def _canonical_gap_fixture():
 
 def test_vectorized_kp_interval_builder_matches_reference():
     raw = _raw_kp_fixture()
-
     expected = _reference_build_kp_intervals(raw)
     actual = build_kp_intervals(raw)
-
     assert_frame_equal(actual, expected)
 
 
@@ -207,15 +193,17 @@ def test_vectorized_event_hourly_expansion_matches_reference():
         dtype=float,
     )
 
-    assert_series_equal(actual, expected)
+    # _expand_to_hourly returns domain objects rather than a pandas Series, so
+    # reconstructing the Series does not preserve DatetimeIndex.freq metadata.
+    # Frequency metadata is not part of the event semantics; timestamps and
+    # values must nevertheless match exactly.
+    assert_series_equal(actual, expected, check_freq=False)
 
 
 def test_vectorized_target_hourly_expansion_matches_reference():
     intervals = _canonical_gap_fixture()
-
     expected = _reference_expand_target(intervals)
     actual = _expand_retrospective_kp_hourly(intervals)
-
     assert_series_equal(actual, expected)
 
 
