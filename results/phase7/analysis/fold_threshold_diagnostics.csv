@@ -1,0 +1,13 @@
+experiment_id,fold,selected_threshold
+t5_h3,walk_forward_1,0.04
+t5_h3,walk_forward_2,0.08
+t5_h6,walk_forward_1,0.07
+t5_h6,walk_forward_2,0.16
+t5_h12,walk_forward_1,0.11
+t5_h12,walk_forward_2,0.19
+t5_h24,walk_forward_1,0.18
+t5_h24,walk_forward_2,0.23
+t6_h6,walk_forward_1,0.02
+t6_h6,walk_forward_2,0.04
+t7_h6,walk_forward_1,0.01
+t7_h6,walk_forward_2,0.01

@@ -1,0 +1,37 @@
+{
+  "comparison_policy": {
+    "cross_task_ranking_authorized": false,
+    "horizon": "Compare T=5 only while varying H.",
+    "severity": "Compare H=6 only while varying T."
+  },
+  "experiments": [
+    "t5_h3",
+    "t5_h6",
+    "t5_h12",
+    "t5_h24",
+    "t6_h6",
+    "t7_h6"
+  ],
+  "horizon_experiments": [
+    "t5_h3",
+    "t5_h6",
+    "t5_h12",
+    "t5_h24"
+  ],
+  "primary_control_id": "t5_h6",
+  "protected_final_test_scored": false,
+  "selected_config_id": "lightgbm_lr0.1_leaves127",
+  "severity_experiments": [
+    "t5_h6",
+    "t6_h6",
+    "t7_h6"
+  ],
+  "target_prevalence": {
+    "t5_h12": 0.018938661925559465,
+    "t5_h24": 0.032466277586673364,
+    "t5_h3": 0.008193870057588992,
+    "t5_h6": 0.011827001120859583,
+    "t6_h6": 0.002048467514397248,
+    "t7_h6": 0.0007343562787461833
+  }
+}

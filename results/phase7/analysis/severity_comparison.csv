@@ -1,0 +1,4 @@
+experiment_id,storm_threshold,horizon_hours,is_primary_control,selected_config_id,selected_threshold,event_recall,n_events,n_detected_events,n_alert_episodes,false_alarm_episodes,valid_exposure_hours,exposure_days,far_per_day,target_prevalence,walk_forward_1_threshold,walk_forward_2_threshold,stability_threshold_min,stability_threshold_max,stability_threshold_count,protected_final_test_scored
+t5_h6,5.0,6,True,lightgbm_lr0.1_leaves127,0.1,0.6774193548387096,31,21,222,200,25873,1078.0416666666667,0.185521586209562,0.011827001120859583,0.07,0.16,0.1,0.13,4,False
+t6_h6,6.0,6,False,lightgbm_lr0.1_leaves127,0.02,1.0,4,4,209,205,25873,1078.0416666666667,0.19015962586480112,0.002048467514397248,0.02,0.04,0.02,0.02,1,False
+t7_h6,7.0,6,False,lightgbm_lr0.1_leaves127,0.01,0.5,2,1,61,60,25873,1078.0416666666667,0.05565647586286862,0.0007343562787461833,0.01,0.01,,,0,False
