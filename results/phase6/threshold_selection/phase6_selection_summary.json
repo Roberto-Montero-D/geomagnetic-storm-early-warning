@@ -1,0 +1,25 @@
+{
+  "fold_selected_thresholds": {
+    "walk_forward_1": 0.07,
+    "walk_forward_2": 0.16
+  },
+  "max_far_per_day": 0.2,
+  "oof_folds": [
+    "walk_forward_1",
+    "walk_forward_2"
+  ],
+  "oof_rows": 25873,
+  "protected_final_test_scored": false,
+  "selected_config_id": "lightgbm_lr0.1_leaves127",
+  "selected_threshold": 0.1,
+  "stability_min_far_per_day": 0.15,
+  "stability_thresholds": [
+    0.1,
+    0.11,
+    0.12,
+    0.13
+  ],
+  "threshold_grid_max": 0.99,
+  "threshold_grid_min": 0.01,
+  "threshold_grid_size": 99
+}
