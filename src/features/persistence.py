@@ -28,6 +28,8 @@ persistence feature is NaN rather than zero because the current condition is
 unknown.
 
 No imputation or fallback to older timestamps is performed.
+
+This implementation preserves those semantics using vectorized run lengths.
 """
 
 from __future__ import annotations
@@ -39,7 +41,6 @@ import pandas as pd
 
 from src.features.raw import PRIMARY_OMNI_FILL_VALUES
 from src.temporal.cutoff import (
-    DEFAULT_INFORMATION_DELAY,
     DEFAULT_INTERVAL_DURATION,
     information_cutoff,
 )
@@ -91,7 +92,9 @@ def _prepare_source(omni: pd.DataFrame) -> pd.DataFrame:
     required = {"bz_gsm", "speed"}
     missing = required - set(omni.columns)
     if missing:
-        raise KeyError(f"Missing persistence OMNI column(s): {sorted(missing)}")
+        raise KeyError(
+            f"Missing persistence OMNI column(s): {sorted(missing)}"
+        )
 
     work = omni.loc[:, ["bz_gsm", "speed"]].copy()
 
@@ -104,46 +107,21 @@ def _prepare_source(omni: pd.DataFrame) -> pd.DataFrame:
     return work.astype(float)
 
 
-def _consecutive_duration(
-    series: pd.Series,
-    latest_start: pd.Timestamp,
-    predicate,
-) -> float:
-    """Return consecutive satisfied hours ending at ``latest_start``.
+def _consecutive_true_run(
+    values: pd.Series,
+    condition: pd.Series,
+) -> pd.Series:
+    """Return consecutive satisfied hours with frozen missing-state semantics."""
+    satisfied = condition & values.notna()
 
-    Missing latest state -> NaN.
-    Latest valid but condition false -> 0.
-    Missing older timestamp/value breaks the run.
-    """
+    # False/missing rows reset the group. Within true groups, cumulative sum is
+    # exactly the consecutive duration ending at each timestamp.
+    group_id = (~satisfied).cumsum()
+    run = satisfied.groupby(group_id).cumsum().astype(float)
 
-    if latest_start not in series.index:
-        return np.nan
-
-    latest_value = series.loc[latest_start]
-    if pd.isna(latest_value):
-        return np.nan
-
-    if not predicate(float(latest_value)):
-        return 0.0
-
-    duration = 0
-    cursor = latest_start
-
-    while True:
-        if cursor not in series.index:
-            break
-
-        value = series.loc[cursor]
-        if pd.isna(value):
-            break
-
-        if not predicate(float(value)):
-            break
-
-        duration += 1
-        cursor -= pd.Timedelta(hours=1)
-
-    return float(duration)
+    # Latest state unknown -> persistence unknown, not zero.
+    run.loc[values.isna()] = np.nan
+    return run
 
 
 def build_persistence_features(
@@ -153,62 +131,79 @@ def build_persistence_features(
     return_audit: bool = False,
 ) -> pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame]:
     """Build frozen causal persistence-duration features."""
-
     prediction_index = _validate_prediction_times(prediction_times)
     source = _prepare_source(omni)
 
-    features = pd.DataFrame(
-        np.nan,
-        index=prediction_index,
-        columns=PERSISTENCE_FEATURE_COLUMNS,
-        dtype=float,
-    )
+    latest_starts = prediction_index - pd.Timedelta(hours=2)
+
+    if source.empty:
+        features = pd.DataFrame(
+            np.nan,
+            index=prediction_index,
+            columns=PERSISTENCE_FEATURE_COLUMNS,
+            dtype=float,
+        )
+    else:
+        # Insert absent physical hours explicitly as NaN so gaps break a run.
+        physical_index = pd.date_range(
+            source.index.min(),
+            source.index.max(),
+            freq="h",
+        )
+        full = source.reindex(physical_index)
+
+        runs = pd.DataFrame(
+            {
+                "bz_gsm_persist_lt_m5h": _consecutive_true_run(
+                    full["bz_gsm"],
+                    full["bz_gsm"] < -5.0,
+                ),
+                "bz_gsm_persist_lt_m10h": _consecutive_true_run(
+                    full["bz_gsm"],
+                    full["bz_gsm"] < -10.0,
+                ),
+                "bz_gsm_persist_lt_m15h": _consecutive_true_run(
+                    full["bz_gsm"],
+                    full["bz_gsm"] < -15.0,
+                ),
+                "speed_persist_gt_500h": _consecutive_true_run(
+                    full["speed"],
+                    full["speed"] > 500.0,
+                ),
+                "speed_persist_gt_600h": _consecutive_true_run(
+                    full["speed"],
+                    full["speed"] > 600.0,
+                ),
+            }
+        )
+
+        features = runs.reindex(latest_starts)
+        features.index = prediction_index
+
+    features = features.loc[:, PERSISTENCE_FEATURE_COLUMNS].astype(float)
     features.index.name = "prediction_time"
 
     audit = pd.DataFrame(index=prediction_index)
     audit.index.name = "prediction_time"
-    audit["information_cutoff"] = pd.DatetimeIndex(
-        [information_cutoff(t) for t in prediction_index]
+
+    audit["information_cutoff"] = pd.Series(
+        [information_cutoff(t) for t in prediction_index],
+        index=prediction_index,
+        name="information_cutoff",
     )
     audit["persistence_information_time"] = pd.NaT
 
-    for row_i, t in enumerate(prediction_index):
-        cutoff = information_cutoff(t)
-        latest_start = (
-            cutoff - DEFAULT_INTERVAL_DURATION
+    source_present = latest_starts.isin(source.index)
+    if source_present.any():
+        provenance = pd.Series(
+            pd.NaT,
+            index=prediction_index,
+            dtype="datetime64[ns]",
         )
-
-        latest_present = latest_start in source.index
-
-        if latest_present:
-            audit.iat[
-                row_i,
-                audit.columns.get_loc("persistence_information_time"),
-            ] = latest_start + DEFAULT_INTERVAL_DURATION
-
-        predicates = (
-            lambda x: x < -5.0,
-            lambda x: x < -10.0,
-            lambda x: x < -15.0,
-            lambda x: x > 500.0,
-            lambda x: x > 600.0,
-        )
-        source_columns = (
-            "bz_gsm",
-            "bz_gsm",
-            "bz_gsm",
-            "speed",
-            "speed",
-        )
-
-        for col_i, (source_column, predicate) in enumerate(
-            zip(source_columns, predicates, strict=True)
-        ):
-            features.iat[row_i, col_i] = _consecutive_duration(
-                source[source_column],
-                latest_start,
-                predicate,
-            )
+        provenance.loc[source_present] = (
+            latest_starts[source_present] + DEFAULT_INTERVAL_DURATION
+        ).to_numpy()
+        audit["persistence_information_time"] = provenance
 
     violation = (
         audit["persistence_information_time"].notna()
