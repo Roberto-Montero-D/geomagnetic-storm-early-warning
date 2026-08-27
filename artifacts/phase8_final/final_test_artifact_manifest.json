@@ -1,0 +1,22 @@
+{
+  "protocol": "MASTER_PROTOCOL_v1.3.md",
+  "phase": 8,
+  "purpose": "Compact repository-level provenance record for the one-time protected Final Test.",
+  "execution_commit": "8c773b1804feabb5cbc1c8dcc08c5340fb20c236",
+  "protected_interval": "2022-01-01/2025-12-31",
+  "consumed_once": true,
+  "official_result_document": "docs/phase8_results.md",
+  "closure_document": "docs/phase8_closure.md",
+  "environment_lock": "requirements-lock-phase8.txt",
+  "original_execution_artifacts": [
+    "results/phase8/final_test/final_test_predictions.csv",
+    "results/phase8/final_test/final_test_alert_episodes.csv",
+    "results/phase8/final_test/final_test_metrics.json",
+    "results/phase8/environment/environment_manifest.json",
+    "results/phase8/environment/pip-freeze.txt",
+    "results/phase8/environment/pip-list.txt",
+    "results/phase8/environment/python-platform.txt"
+  ],
+  "repository_archival_note": "The full original Phase 8 generated result directory is not reconstructed or rerun for repository cleanup. This archive preserves the official metric summary and provenance pointers without altering the confirmatory result. Cryptographic hashes of original local artifacts were not available to this repository-only cleanup and therefore are intentionally not invented.",
+  "retuning_from_phase8_for_v1_3": "forbidden"
+}
