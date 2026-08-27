@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from scripts.run_phase5_model_selection import build_phase5_inputs
+from scripts.run_phase5_screening import build_phase5_screening_inputs
 from src.final_test.diagnostics_operational import (
     event_outcomes,
     yearly_operational_decomposition,
@@ -28,10 +28,15 @@ def run_phase9_1(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Rebuild canonical event truth using the already-frozen repository
-    # definitions. No model fitting or threshold selection occurs here.
-    inputs = build_phase5_inputs(omni_fmt, omni_lst)
-    events = inputs.events
+    (
+        _dataset,
+        _splits,
+        _folds,
+        events,
+    ) = build_phase5_screening_inputs(
+        omni_fmt,
+        omni_lst,
+    )
 
     episodes = pd.read_csv(
         phase8_dir / "final_test_alert_episodes.csv"
@@ -59,6 +64,10 @@ def run_phase9_1(
     print(f"Event rows: {len(outcomes)}")
     print(f"Detected: {int(outcomes['detected'].sum())}")
     print(f"Missed: {int((~outcomes['detected']).sum())}")
+    print(
+        "False-alarm episodes: "
+        f"{int(yearly['false_alarm_episodes'].sum())}"
+    )
     print(f"Results written to: {output_dir}")
 
 
