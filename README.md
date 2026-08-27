@@ -1,23 +1,22 @@
 # Geomagnetic Storm Early Warning System
 
-**Status:** Protocol Frozen — Phases 0–7 Complete; Phase 8 Final Test Locked  
+**Status:** Protocol v1.3 complete — Phases 0–9 closed  
 **Protocol:** `MASTER_PROTOCOL_v1.3.md`  
-**Primary Horizon:** 6 hours  
-**Primary Storm Threshold:** Kp >= 5  
+**Protected Final Test:** consumed once (2022–2025)  
 **Frozen Model:** `lightgbm_lr0.1_leaves127`  
 **Frozen Operational Threshold:** `tau = 0.10`
 
-## 1. Project Overview
+## Project Overview
 
-This repository implements a scientifically controlled early-warning system for geomagnetic storms.
+This repository implements a scientifically controlled early-warning experiment for geomagnetic storms:
 
 > Given only information available at prediction time `t`, can the system warn that geomagnetic storm conditions will occur within the next `H` hours?
 
-Development decisions are frozen before later results are inspected. The primary predictor universe is causally eligible OMNI solar-wind measurements plus conservative causal Kp history. AE, Dst, and CDAW/LASCO CME-derived predictors remain excluded from the primary causal feature matrix.
+The project emphasizes causal timestamp semantics, temporal leakage prevention, walk-forward development, pre-specified operational evaluation, a single protected Final Test, and explicitly post-hoc scientific diagnostics.
 
-The protected 2022–2025 Final Test remains untouched.
+The v1.3 experiment is closed. Future model improvements informed by the protected-test outcome require a new protocol/version and a new unseen confirmatory evaluation set.
 
-## 2. Frozen Primary Configuration
+## Frozen Primary Configuration
 
 | Parameter | Frozen value |
 |---|---:|
@@ -28,249 +27,113 @@ The protected 2022–2025 Final Test remains untouched.
 | Maximum FAR/day | 0.2 |
 | Information cutoff | `t - 1h` |
 | Canonical prediction grid | `[1996-01-01, 2026-01-01)` hourly |
-| Protected Final Test | 2022–2025 |
+| Protected Final Test | 2022–2025, consumed once |
 | Causal feature universe | 93 |
-| Selected model-input set | Experiment A — 10 raw features |
+| Selected model-input set | Phase 3 Experiment A — 10 raw features |
 | Imbalance strategy | `none` |
 | Model | `lightgbm_lr0.1_leaves127` |
 | Operational threshold | `0.10` |
 
-## 3. Feature Universe vs. Selected Model Input
+The canonical dataset contains 93 causally eligible predictors. Phase 3 selected the 10-feature raw family for the frozen primary model; the remaining causal features stayed available for audit infrastructure and later descriptive diagnostics but were not silently reintroduced into model selection.
 
-Phase 0 froze a **93-feature causal universe**: raw, rolling, persistence, dynamics, and interactions. Phase 1 therefore builds 93 predictors plus the target.
-
-Phase 3 later selected **Experiment A**, the **10-feature raw family**, for downstream primary modeling.
-
-> The canonical dataset contains 93 predictors, while the frozen Phase 4–7 primary model uses the 10-feature Phase 3 Experiment A subset.
-
-The remaining causal features stay in the dataset/audit infrastructure but are not silently reintroduced into the selected model.
-
-## 4. Canonical Target and Causality
+## Target and Temporal Semantics
 
 ```text
 y_event(t) = max(Kp[t+1:t+H]) >= T
 T = 5
-H = 6h
+H = 6 h
 window = (t, t+H]
+information_cutoff = t - 1 h
 ```
 
-Despite the historical name `y_event`, this is a future storm-condition target, not an event-onset-only target.
+Future retrospective Kp defines target/event truth but never enters the predictor matrix at prediction time.
 
-For prediction time `t`:
+Development used temporal screening/walk-forward folds ending in 2021. The 2022–2025 interval was isolated from all feature, imbalance, model, hyperparameter, threshold, horizon, severity, and candidate-selection decisions before its one-time Phase 8 evaluation.
+
+## Phase Summary
+
+| Phase | Scope | Status |
+|---|---|---|
+| 0 | Causality and temporal semantics | COMPLETE |
+| 1 | Dataset, row status, temporal splits | COMPLETE |
+| 2 | Baselines/evaluation | COMPLETE |
+| 3 | Feature screening | COMPLETE / FROZEN |
+| 4 | Imbalance experiments | COMPLETE / FROZEN |
+| 5 | Model selection | COMPLETE / FROZEN |
+| 6 | OOF threshold selection | COMPLETE / FROZEN |
+| 7 | Horizon/severity experiments | COMPLETE / FROZEN |
+| 8 | Protected Final Test | COMPLETE / CONSUMED ONCE |
+| 9 | Post-hoc interpretation/scientific audit | COMPLETE / CLOSED |
+
+## Development Freeze
+
+Phase 5 selected:
 
 ```text
-information_cutoff = t - 1h
-maximum_feature_information_time <= information_cutoff
+model = lightgbm_lr0.1_leaves127
 ```
 
-Future retrospective Kp may define target/event truth but may never enter the predictor matrix.
-
-## 5. Temporal Validation
-
-| Atomic period | Period |
-|---|---|
-| Initial Train | 1996–2016 |
-| Validation 1 | 2017–2018 |
-| Validation 2 | 2019–2020 |
-| Validation 3 | 2021 |
-| Final Test | 2022–2025 |
-
-```text
-screening       1996–2016 -> 2017–2018
-walk_forward_1  1996–2018 -> 2019–2020
-walk_forward_2  1996–2020 -> 2021
-```
-
-Final Test rows are excluded from every development train and validation mask.
-
-## 6. Phase Summary
-
-### Phase 0 — COMPLETE
-Frozen causal timestamp/availability semantics, canonical Kp, storm events, alert episodes, 93-feature causal pipeline, target construction, and leakage/temporal-integrity tests.
-
-### Phase 1 — COMPLETE
-Frozen canonical hourly grid, row-preserving 93-feature dataset, row status, development folds, and protected Final Test isolation.
-
-### Phase 2 — COMPLETE
-Implemented B0 persistence, B1 physical, B2 Logistic Regression, B3 ExtraTrees, and canonical development-only operational evaluation.
-
-### Phase 3 — COMPLETE / FROZEN
-Selected **Experiment A — 10 raw features**.
-
-### Phase 4 — COMPLETE / FROZEN
-Selected imbalance strategy:
-
-```text
-none
-```
-
-No resampling and no class weighting.
-
-### Phase 5 — COMPLETE / FROZEN
-
-Selected model:
-
-```text
-lightgbm_lr0.1_leaves127
-```
-
-| Fold | Event Recall | FAR/day | PR-AUC |
-|---|---:|---:|---:|
-| WF1 | 0.7333 | 0.1899 | 0.2532 |
-| WF2 | 0.7500 | 0.1936 | 0.3052 |
-
-Aggregate ranking values: worst-fold Event Recall `0.7333`, mean Event Recall `0.7417`, mean PR-AUC `0.2792`, mean FAR/day `0.1917`.
-
-### Phase 6 — COMPLETE / FROZEN
-
-Generated 25,873 development-only OOF predictions from the frozen LightGBM model and swept `tau=0.01..0.99`.
-
-Frozen rule: select the **lowest** threshold satisfying `FAR/day <= 0.2`.
+Phase 6 selected the lowest OOF threshold satisfying the development constraint `FAR/day <= 0.2`:
 
 ```text
 tau = 0.09 -> FAR/day = 0.20036 -> infeasible
 tau = 0.10 -> FAR/day = 0.18552 -> feasible
 ```
 
-Therefore:
+Therefore `tau = 0.10` was frozen before protected-test outcome access.
+
+Phase 7 executed only the pre-authorized horizon/severity truth variants and did not reopen the primary configuration. The primary task remained `T=5`, `H=6 h`.
+
+## Official Protected Final Test Result
+
+Phase 8 executed the frozen primary system exactly once on 2022–2025. The execution commit was:
 
 ```text
-Frozen tau       = 0.10
-Event Recall     = 21 / 31 = 0.6774
-FAR/day          = 0.1855
-Alert episodes   = 222
-False alarms     = 200
+8c773b1804feabb5cbc1c8dcc08c5340fb20c236
 ```
 
-### Phase 7 — COMPLETE / FROZEN
+| Metric | Final Test |
+|---|---:|
+| Event Recall | **0.5430** |
+| Detected events | **82 / 151** |
+| FAR/day | **0.3681** |
+| Median early lead time | **3.0 h** |
+| PR-AUC | **0.4960** |
+| ROC-AUC | **0.8826** |
+| Brier score | **0.03965** |
 
-Phase 7 changed only pre-authorized retrospective truth definitions while keeping the Phase 3–6 predictor/model framework frozen.
+The pre-specified operational constraint `FAR/day <= 0.20` **did not generalize** to the protected Final Test. The threshold was not changed after observing this result.
 
-The `t5_h6` positive control reproduced Phase 6 exactly:
+The confirmatory conclusion is therefore deliberately limited: the selected predictor/model retained meaningful out-of-sample probabilistic discrimination, but the frozen operating point did not satisfy the required false-alarm burden and detected 54.3% of canonical storm events.
 
-```text
-OOF rows = 25,873
-maximum probability absolute difference = 0
-```
+See `docs/phase8_results.md` and `docs/phase8_closure.md` for the authoritative interpretation.
 
-Controlled horizon comparison (`T=5`):
+## Phase 9 Scientific Audit
 
-| Experiment | H | Selected tau | Event Recall | Detected / Events | FAR/day |
-|---|---:|---:|---:|---:|---:|
-| `t5_h3` | 3 h | 0.05 | 0.6774 | 21 / 31 | 0.1939 |
-| `t5_h6` | 6 h | 0.10 | 0.6774 | 21 / 31 | 0.1855 |
-| `t5_h12` | 12 h | 0.13 | 0.8387 | 26 / 31 | 0.1929 |
-| `t5_h24` | 24 h | 0.20 | 0.9032 | 28 / 31 | 0.1939 |
+Phase 9 is post-hoc and explanatory only. It examined operational/temporal behavior, physical error regimes, event context/recurrence, pre-onset physical state, and signal timing. These diagnostics do not redefine the Phase 8 result and are not permitted to retune v1.3.
 
-Controlled severity comparison (`H=6 h`):
+SHAP/model-internal attribution was not reconstructed by refitting the protected-test estimator; the limitation is documented rather than violating the no-refit/no-retuning boundary.
 
-| Experiment | T | Event Recall | Detected / Events |
-|---|---:|---:|---:|
-| `t5_h6` | 5 | 0.6774 | 21 / 31 |
-| `t6_h6` | 6 | 1.0000 | 4 / 4 |
-| `t7_h6` | 7 | 0.5000 | 1 / 2 |
+See `docs/phase9_closure.md` for the complete diagnostic synthesis.
 
-The severity results are strongly sample-size limited. They are descriptive diagnostics, not evidence for replacing the primary task.
+## Reproducibility and Tests
 
-Longer T=5 horizons increase both Event Recall and target prevalence, so the horizon variants are different operational questions rather than interchangeable model candidates.
-
-The frozen primary configuration remains `T=5`, `H=6 h`, `tau=0.10`.
-
-## 7. Final Test Protection
-
-The 2022–2025 Final Test may not influence feature, imbalance, model, hyperparameter, threshold, horizon, severity, or candidate-selection decisions before its protocol-authorized evaluation.
-
-The official Phase 7 analysis records:
-
-```text
-primary_control_id = t5_h6
-protected_final_test_scored = false
-cross_task_ranking_authorized = false
-```
-
-## 8. Current Status
-
-| Phase | Status |
-|---|---|
-| 0 — Causality/temporal infrastructure | COMPLETE |
-| 1 — Dataset/splits | COMPLETE |
-| 2 — Baselines | COMPLETE |
-| 3 — Feature screening | COMPLETE / FROZEN |
-| 4 — Imbalance experiments | COMPLETE / FROZEN |
-| 5 — Model selection | COMPLETE / FROZEN |
-| 6 — OOF threshold selection | COMPLETE / FROZEN |
-| 7 — Horizon/severity experiments | COMPLETE / FROZEN |
-| 8 — Protected Final Test | LOCKED / NEXT |
-| 9 — Interpretation/scientific audit | PENDING |
-
-## 9. Documentation and Results
-
-Current decision records include:
-
-```text
-docs/phase5_model_selection_contract.md
-docs/phase5_model_selection_results.md
-docs/phase5_closure.md
-docs/phase6_threshold_selection_contract.md
-docs/phase6_threshold_selection_results.md
-docs/phase6_closure.md
-docs/phase7_horizon_severity_contract.md
-docs/phase7_results.md
-docs/phase7_closure.md
-docs/project_status.md
-```
-
-Machine-readable result summaries include:
-
-```text
-results/phase5/screening/
-results/phase5/confirmation/
-results/phase6/threshold_selection/
-results/phase7/experiments/
-results/phase7/analysis/
-```
-
-## 10. Reproducibility
-
-Run the complete test suite with:
+Run the test suite with:
 
 ```bash
 python -m pytest -q
 ```
 
-Phase 6 runner:
+The repository contains dedicated tests for causal cutoff semantics, future-mutation leakage, event/alert definitions, temporal splits, development/final-test isolation, model/threshold freeze logic, Phase 8 scoring/provenance, and Phase 9 diagnostics.
 
-```bash
-python -m scripts.run_phase6_threshold_selection --omni-fmt <path-to-omni.fmt> --omni-lst <path-to-omni.lst> --output-dir results/phase6/threshold_selection
-```
+The Phase 8 environment was frozen separately in `requirements-lock-phase8.txt`. The repository also records the one-time execution commit and official metrics. A compact archival summary is retained under `artifacts/phase8_final/`.
 
-Phase 7 experiment runner:
+Raw data are not committed. Historical machine-readable development outputs under `results/` are retained where already tracked; new generated result directories remain ignored by default.
 
-```bash
-python -m scripts.run_phase7_experiments --omni-fmt <path-to-omni.fmt> --omni-lst <path-to-omni.lst> --output-dir results/phase7/experiments
-```
+## Scientific Status
 
-Phase 7 analysis runner:
+Protocol v1.3 is closed. Its official result must not be improved retrospectively by changing features, imbalance handling, model, threshold, task horizon/severity, or event/alert semantics.
 
-```bash
-python -m scripts.run_phase7_analysis --phase6-dir results/phase6/threshold_selection --phase7-experiments-dir results/phase7/experiments --output-dir results/phase7/analysis
-```
+Any successor system may use the Phase 8/9 findings as hypothesis-generating evidence, but it must be labeled as a new protocol/version and evaluated on new unseen confirmatory data.
 
-All Phase 0–7 runners are development-only with respect to selection and comparison logic.
-
-## 11. Next Step
-
-Proceed to **Phase 8 — protected Final Test evaluation** only through a dedicated frozen execution path.
-
-Before Final Test outcomes are accessed, the Phase 8 runner and its tests must enforce the unchanged primary configuration:
-
-```text
-T = 5
-H = 6 h
-feature set = Phase 3 Experiment A
-imbalance = none
-model = lightgbm_lr0.1_leaves127
-tau = 0.10
-```
-
-No Phase 7 alternative horizon or severity result may replace that primary configuration.
+The repository-level closure record is `docs/project_v1.3_closure.md`.
