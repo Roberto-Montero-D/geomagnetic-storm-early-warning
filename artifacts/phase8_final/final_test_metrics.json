@@ -1,0 +1,40 @@
+{
+  "artifact_status": "official_final_out_of_sample_summary",
+  "protocol": "MASTER_PROTOCOL_v1.3.md",
+  "phase": 8,
+  "protected_interval": "2022-01-01/2025-12-31",
+  "execution_commit": "8c773b1804feabb5cbc1c8dcc08c5340fb20c236",
+  "primary_experiment": "t5_h6",
+  "final_test_consumed": true,
+  "retuning_authorized": false,
+  "frozen_configuration": {
+    "T": 5,
+    "H_hours": 6,
+    "Z_hours": 6,
+    "C_hours": 3,
+    "max_far_per_day": 0.2,
+    "feature_set": "Phase 3 Experiment A",
+    "selected_feature_count": 10,
+    "imbalance_strategy": "none",
+    "model": "lightgbm_lr0.1_leaves127",
+    "operational_threshold": 0.10,
+    "training_window": "[1996-01-01, 2022-01-01)",
+    "final_test_window": "[2022-01-01, 2026-01-01)"
+  },
+  "metrics": {
+    "event_recall": 0.5430463576,
+    "detected_events": 82,
+    "total_events": 151,
+    "far_per_day": 0.3680874062,
+    "median_early_lead_time_hours": 3.0,
+    "alert_episodes": 611,
+    "false_alarm_episodes": 525,
+    "early_detection_episodes": 41,
+    "late_detection_episodes": 45,
+    "pr_auc": 0.4959636205,
+    "roc_auc": 0.8825873610,
+    "brier_score": 0.0396522111
+  },
+  "operational_constraint_met": false,
+  "authoritative_document": "docs/phase8_results.md"
+}
